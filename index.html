@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title class="app-title-text">SISFO STOK BARANG IPSRS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- SDK SUPABASE V2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 50%, #110e2e 0%, #060410 100%);
+      color: #f3f4f6;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .glass-card { 
+      background: rgba(18, 15, 48, 0.45); 
+      backdrop-filter: blur(16px); 
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05), 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+      box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.1), 0 12px 40px 0 rgba(99, 102, 241, 0.12);
+    }
+    .nav-btn {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+    }
+    .nav-btn:not(.active-tab):hover {
+      background: rgba(99, 102, 241, 0.15);
+      color: white !important;
+    }
+    @media (min-width: 768px) {
+      .nav-btn:not(.active-tab):hover { transform: translateX(6px); }
+      .active-tab {
+        background: linear-gradient(135deg, #4f46e5 0%, #201b5c 100%);
+        box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 0 20px 2px rgba(99, 102, 241, 0.4);
+        border-right: 4px solid #a5b4fc;
+        border-top: 1px solid rgba(165, 180, 252, 0.2);
+        border-bottom: 1px solid rgba(165, 180, 252, 0.2);
+        color: #ffffff !important;
+        transform: translateX(4px);
+      }
+    }
+    @media (max-width: 767px) {
+      .active-tab {
+        background: linear-gradient(to top, rgba(79, 70, 229, 0.4) 0%, transparent 100%);
+        border-top: 3px solid #a5b4fc;
+        color: #ffffff !important;
+        box-shadow: 0 -5px 15px rgba(99, 102, 241, 0.3);
+      }
+    }
+    .active-tab i { color: #c7d2fe !important; filter: drop-shadow(0 0 4px rgba(255,255,255,0.4)); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 12, 41, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
+    .sticky-header { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(16px); }
+    #sync-overlay {
+      position: fixed; inset: 0; z-index: 9999; background: rgba(6, 4, 16, 0.85); backdrop-filter: blur(12px);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .category-scroll-wrapper {
+      display: flex;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      gap: 0.5rem;
+      padding-bottom: 4px;
+    }
+    .category-scroll-wrapper::-webkit-scrollbar { height: 4px; }
+    @media print {
+      @page { margin: 15mm; size: A4 portrait; }
+      body { background: white !important; color: black !important; display: block; height: auto !important; overflow: visible !important; }
+      .no-print, nav, aside, form, button, footer, #toast-notif, .modal-backdrop, #sync-overlay { display: none !important; }
+      .glass-card { background: none !important; border: none !important; box-shadow: none !important; padding: 0 !important; margin-bottom: 20px !important; }
+      .tab-content { display: none !important; }
+      .print-section { display: block !important; }
+      table { width: 100% !important; border-collapse: collapse !important; margin-top: 15px !important; }
+      th, td { border: 1px solid #000 !important; color: black !important; padding: 6px !important; font-size: 11px !important; }
+      th { background-color: #f0f0f0 !important; font-weight: bold !important; text-transform: uppercase;}
+      .text-white, .text-indigo-200, .text-indigo-300, .text-emerald-400, .text-rose-400, .text-rose-300, .text-slate-400, .text-slate-300 { color: black !important; }
+      #print-header { display: block !important; margin-bottom: 30px; }
+    }
+  </style>
+</head>
+<body class="flex flex-col md:flex-row w-full h-screen">
+
+  <!-- OVERLAY SINKRONISASI -->
+  <div id="sync-overlay">
+    <div class="h-16 w-16 text-indigo-500 mb-4 animate-spin text-5xl flex items-center justify-center">
+      <i class="fa-solid fa-circle-notch"></i>
+    </div>
+    <h2 class="text-white text-lg font-bold tracking-wide">Sinkronisasi Real-time...</h2>
+    <p class="text-indigo-300 mt-1 text-sm animate-pulse">Menghubungkan layanan SISFO STOK IPSRS RSUD Sinjai...</p>
+  </div>
+
+  <!-- KOP SURAT CETAK (PDF) -->
+  <div id="print-header" class="hidden w-full">
+    <div class="border-b-4 border-black pb-4 flex items-center justify-between gap-4">
+      <div class="w-20 h-20 border-2 border-black rounded-full flex flex-col items-center justify-center font-bold text-[10px] text-center shrink-0">
+        <i class="fa-solid fa-plus text-2xl mb-1"></i> RSUD
+      </div>
+      <div class="text-center flex-1">
+        <h2 class="text-lg font-bold uppercase tracking-wide">Pemerintah Kabupaten Sinjai</h2>
+        <h1 class="text-2xl font-black uppercase tracking-wider app-title-text">SISFO STOK BARANG IPSRS</h1>
+        <p class="text-xs mt-1 app-subtitle-text">RSUD SINJAI - SULAWESI SELATAN</p>
+      </div>
+      <div class="w-20 h-20 shrink-0"></div> 
+    </div>
+    <div class="mt-6 text-center">
+      <h3 class="font-extrabold text-lg uppercase underline" id="print-title-doc">Laporan Sistem Data Barang IPSRS</h3>
+      <p class="text-sm mt-2 font-medium" id="print-date-doc">Periode: -</p>
+    </div>
+  </div>
+
+  <!-- ASIDE / SIDEBAR -->
+  <aside class="fixed bottom-0 md:relative md:h-full left-0 w-full md:w-72 glass-card md:m-3 md:rounded-3xl flex flex-row md:flex-col shrink-0 no-print z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] md:shadow-2xl border-t md:border-t-0 md:border-r border-indigo-500/15 bg-[#090718] md:bg-transparent overflow-x-auto md:overflow-x-hidden">
+    <div class="hidden md:flex p-6 border-b border-indigo-500/10 flex-col items-center justify-center gap-4 text-center">
+      <div class="h-16 w-16 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+        <i class="fa-solid fa-database text-white text-3xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-extrabold text-white tracking-wide leading-tight app-title-text">SISFO STOK BARANG IPSRS</h1>
+        <p class="text-[10px] text-indigo-300 font-medium tracking-wide mt-2 app-subtitle-text font-semibold">RSUD SINJAI - SULAWESI SELATAN</p>
+        <div id="connection-status-badge" class="mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 justify-center">
+          <span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span> Menginisialisasi...
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 md:overflow-y-auto p-1.5 md:p-3 flex flex-row md:flex-col gap-1 md:gap-2 w-max md:w-auto mx-auto md:mx-0">
+      <button onclick="showTab('tab-dashboard')" id="btn-tab-dashboard" class="nav-btn px-4 py-2 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-gray-400 flex flex-col md:flex-row items-center gap-1 md:gap-3 shrink-0">
+        <i class="fa-solid fa-chart-line text-base md:text-lg w-6 text-center text-indigo-400"></i><span>Dashboard</span>
+      </button>
+      <button onclick="showTab('tab-master')" id="btn-tab-master" class="nav-btn px-4 py-2 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-gray-400 flex flex-col md:flex-row items-center gap-1 md:gap-3 shrink-0">
+        <i class="fa-solid fa-folder-tree text-base md:text-lg text-amber-400 w-6 text-center"></i><span>Referensi</span>
+      </button>
+      <button onclick="showTab('tab-logistik')" id="btn-tab-logistik" class="nav-btn px-4 py-2 py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-gray-400 flex flex-col md:flex-row items-center gap-1 md:gap-3 shrink-0">
+        <i class="fa-solid fa-truck-moving text-base md:text-lg text-emerald-400 w-6 text-center"></i><span>Logistik</span>
+      </button>
+      <button onclick="showTab('tab-stok')" id="btn-tab-stok" class="nav-btn px-4 py-2 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-gray-400 flex flex-col md:flex-row items-center gap-1 md:gap-3 shrink-0">
+        <i class="fa-solid fa-warehouse text-base md:text-lg w-6 text-center text-sky-400"></i><span>Stok Gudang</span>
+      </button>
+      <button onclick="showTab('tab-laporan')" id="btn-tab-laporan" class="nav-btn px-4 py-2 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-gray-400 flex flex-col md:flex-row items-center gap-1 md:gap-3 shrink-0">
+        <i class="fa-solid fa-layer-group text-base md:text-lg text-indigo-300 w-6 text-center"></i><span>Laporan</span>
+      </button>
+      <button onclick="showTab('tab-bot')" id="btn-tab-bot" class="nav-btn px-4 py-2 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-bold text-indigo-300 flex flex-col md:flex-row items-center gap-1 md:gap-3 bg-indigo-950/40 md:border border-indigo-500/20 shrink-0">
+        <i class="fa-solid fa-robot text-base md:text-lg text-indigo-400 w-6 text-center animate-pulse"></i><span>Asisten AI Bot</span>
+      </button>
+    </nav>
+    
+    <div class="p-4 border-t border-indigo-500/10 text-center bg-indigo-950/20 hidden md:block">
+      <div class="text-[11px] font-bold px-3 py-2 bg-black/30 rounded-xl text-indigo-200 shadow-inner" id="live-clock">Memuat Waktu...</div>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col overflow-y-auto w-full px-4 md:px-8 py-6 pb-24 md:pb-6 scroll-smooth">
+    
+    <div class="md:hidden flex items-center justify-between mb-6 no-print">
+      <div class="flex items-center gap-2.5">
+        <div class="h-9 w-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+          <i class="fa-solid fa-database text-base"></i>
+        </div>
+        <h1 class="text-sm font-black text-white tracking-wide uppercase app-title-text leading-none font-extrabold">IPSRS SINJAI</h1>
+      </div>
+      <div id="auth-status-badge-mobile" class="text-[9px] font-bold px-2.5 py-1 rounded-full">Belum Verifikasi</div>
+    </div>
+
+    <!-- Tab Dashboard -->
+    <section id="tab-dashboard" class="tab-content hidden space-y-6">
+      <h2 class="text-2xl font-black text-white drop-shadow flex items-center gap-3"><i class="fa-solid fa-chart-pie text-indigo-400"></i> Dashboard Ikhtisar</h2>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+          <div>
+            <p class="text-[10px] font-bold text-indigo-300 uppercase tracking-wider">Item Gudang Tersedia</p>
+            <h3 class="text-2xl font-black mt-1 text-white" id="dash-total-master">0</h3>
+            <p class="text-[9px] text-indigo-300/60 mt-0.5">Jenis variasi barang aktif</p>
+          </div>
+          <div class="h-10 w-10 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-boxes-stacked"></i></div>
+        </div>
+        
+        <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+          <div class="w-full">
+            <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Kuantitas Masuk</p>
+            <h3 class="text-2xl font-black text-emerald-400 mt-1" id="dash-total-masuk">0</h3>
+            <div class="mt-1 flex items-center gap-1.5">
+              <span id="dash-pct-masuk" class="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">0%</span>
+              <span class="text-[8px] text-slate-400">volume masuk</span>
+            </div>
+          </div>
+          <div class="h-10 w-10 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-arrow-trend-up"></i></div>
+        </div>
+        
+        <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+          <div class="w-full">
+            <p class="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Kuantitas Keluar</p>
+            <h3 class="text-2xl font-black text-rose-400 mt-1" id="dash-total-keluar">0</h3>
+            <div class="mt-1 flex items-center gap-1.5">
+              <span id="dash-pct-keluar" class="text-[9px] font-bold bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded">0%</span>
+              <span class="text-[8px] text-slate-400">volume keluar</span>
+            </div>
+          </div>
+          <div class="h-10 w-10 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-arrow-trend-down"></i></div>
+        </div>
+        
+        <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border border-amber-500/25 bg-amber-950/10">
+          <div>
+            <p class="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Item Stok Kritis</p>
+            <h3 class="text-2xl font-black text-amber-400 mt-1" id="dash-total-kritis">0</h3>
+            <p class="text-[9px] text-amber-400/80 font-medium mt-1"><i class="fa-solid fa-triangle-exclamation animate-pulse"></i> Stok Menipis</p>
+          </div>
+          <div class="h-10 w-10 bg-amber-500/15 text-amber-400 rounded-xl flex items-center justify-center text-lg shrink-0"><i class="fa-solid fa-circle-exclamation"></i></div>
+        </div>
+      </div>
+
+      <!-- ROW METRIKS & GRAFIK -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div class="lg:col-span-8 flex flex-col gap-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="glass-card rounded-2xl p-4 border-l-4 border-amber-500 flex flex-col justify-between h-[200px]">
+              <div>
+                <h3 class="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2 mb-2 font-semibold">
+                  <i class="fa-solid fa-triangle-exclamation text-amber-400 animate-pulse"></i> Daftar Barang Stok Kritis
+                </h3>
+                <div class="overflow-y-auto max-h-[140px] pr-1">
+                  <table class="w-full text-left text-[11px]">
+                    <thead>
+                      <tr class="border-b border-indigo-500/10 text-indigo-300">
+                        <th class="pb-1 font-semibold">Barang</th>
+                        <th class="pb-1 text-right font-semibold">Sisa</th>
+                        <th class="pb-1 text-right font-semibold">Min</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dash-table-kritis-30hari" class="divide-y divide-indigo-900/20">
+                      <tr><td colspan="3" class="py-2 text-center text-slate-400">Memuat data...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 border-l-4 border-sky-500 flex flex-col justify-between h-[200px]">
+              <div>
+                <h3 class="text-[11px] font-bold text-sky-300 uppercase tracking-wider flex items-center gap-2 mb-2 font-semibold">
+                  <i class="fa-solid fa-fire text-orange-400"></i> Barang Paling Sering Keluar
+                </h3>
+                <div class="overflow-y-auto max-h-[140px] pr-1">
+                  <table class="w-full text-left text-[11px]">
+                    <thead>
+                      <tr class="border-b border-indigo-500/10 text-indigo-300">
+                        <th class="pb-1 font-semibold">Nama Barang</th>
+                        <th class="pb-1 text-right font-semibold">Kuantitas</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dash-table-populer-30hari" class="divide-y divide-indigo-900/20">
+                      <tr><td colspan="2" class="py-2 text-center text-slate-400">Memuat data...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-4 border-l-4 border-indigo-500 flex flex-col justify-between min-h-[135px]">
+            <div>
+              <div class="flex items-center justify-between mb-2.5">
+                <h3 class="text-[11px] font-bold text-indigo-200 uppercase tracking-wider flex items-center gap-2 font-semibold">
+                  <i class="fa-solid fa-hospital-user text-indigo-400"></i> Unit Teraktif (Penerima Terbanyak)
+                </h3>
+                <span class="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold shrink-0">Distribusi Teraktif</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-3 w-full" id="dash-grid-unit-aktif">
+                <div class="bg-black/20 p-2 rounded-xl text-center py-4 text-slate-400 text-[11px] col-span-3">Menganalisis transaksi...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-4 flex flex-col">
+          <div class="glass-card rounded-2xl p-5 flex flex-col justify-between h-full border-t-4 border-indigo-500">
+            <div>
+              <h3 class="text-[11px] font-bold text-indigo-200 uppercase tracking-wider flex items-center gap-2 mb-1 font-semibold">
+                <i class="fa-solid fa-chart-pie text-indigo-400"></i> Rekap Barang Keluar Berdasarkan Satuan
+              </h3>
+              <p class="text-[10px] text-indigo-300/80 mb-2">Penyaluran logistik berdasarkan kemasan</p>
+            </div>
+            
+            <div class="relative flex items-center justify-center flex-1 max-h-[160px] my-1">
+              <canvas id="pieChartSatuan"></canvas>
+              <div class="absolute flex flex-col items-center justify-center pointer-events-none text-center font-bold">
+                <span class="text-[8px] text-indigo-200 uppercase tracking-wider leading-none">Total</span>
+                <span id="infographic-chart-total" class="text-sm font-extrabold text-white mt-0.5">0</span>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-indigo-500/10 mt-2">
+              <div class="grid grid-cols-2 gap-2 text-[9px]" id="pieChart-legend"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-emerald-500">
+          <h3 class="text-sm font-extrabold mb-4 text-indigo-200 uppercase tracking-wider flex items-center gap-2 font-semibold"><i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Riwayat Masuk Terbaru</h3>
+          <div class="overflow-x-auto"><table class="w-full text-left text-sm"><tbody id="dash-table-masuk" class="divide-y divide-indigo-950/20"><tr><td class="pt-4 text-center text-slate-400 text-xs">Memuat data...</td></tr></tbody></table></div>
+        </div>
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-rose-500">
+          <h3 class="text-sm font-extrabold mb-4 text-indigo-200 uppercase tracking-wider flex items-center gap-2 font-semibold"><i class="fa-solid fa-truck-ramp-box text-rose-400"></i> Riwayat Keluar Terbaru</h3>
+          <div class="overflow-x-auto"><table class="w-full text-left text-sm"><tbody id="table-keluar-body-dashboard" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab Referensi -->
+    <section id="tab-master" class="tab-content hidden space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="text-2xl font-black text-white flex justify-center md:justify-start items-center gap-2"><i class="fa-solid fa-folder-tree text-amber-300"></i> Master Referensi & Keamanan</h2>
+        </div>
+        <button onclick="handleLogout()" class="px-4 py-2 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"><i class="fa-solid fa-power-off"></i> Kunci Sesi</button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-indigo-500">
+           <div class="flex justify-between items-center mb-3 pb-2 border-b border-indigo-500/10">
+               <h3 class="font-extrabold text-indigo-200 uppercase text-[11px] tracking-widest font-semibold">Kategori Barang</h3>
+               <button onclick="openModalMaster('Kategori')" class="text-[10px] bg-indigo-600 px-3 py-1.5 rounded-lg text-white font-bold"><i class="fa-solid fa-plus"></i> Tambah</button>
+           </div>
+           <ul id="list-kategori" class="space-y-1 text-sm text-white max-h-[200px] overflow-y-auto pr-1"></ul>
+        </div>
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-sky-500">
+           <div class="flex justify-between items-center mb-3 pb-2 border-b border-indigo-500/10">
+               <h3 class="font-extrabold text-indigo-200 uppercase text-[11px] tracking-widest font-semibold">Satuan Barang</h3>
+               <button onclick="openModalMaster('Satuan')" class="text-[10px] bg-sky-600 px-3 py-1.5 rounded-lg text-white font-bold"><i class="fa-solid fa-plus"></i> Tambah</button>
+           </div>
+           <ul id="list-satuan" class="space-y-1 text-sm text-white max-h-[200px] overflow-y-auto pr-1"></ul>
+        </div>
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-amber-500">
+           <div class="flex justify-between items-center mb-3 pb-2 border-b border-indigo-500/10">
+               <h3 class="font-extrabold text-indigo-200 uppercase text-[11px] tracking-widest font-semibold">Unit Kerja</h3>
+               <button onclick="openModalMaster('Unit Kerja')" class="text-[10px] bg-amber-600 px-3 py-1.5 rounded-lg text-white font-bold"><i class="fa-solid fa-plus"></i> Tambah</button>
+           </div>
+           <ul id="list-unit" class="space-y-1 text-sm text-white max-h-[200px] overflow-y-auto pr-1"></ul>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-amber-400 space-y-4">
+          <h3 class="font-extrabold text-indigo-200 uppercase text-xs tracking-widest pb-2 border-b border-indigo-500/10 font-semibold"><i class="fa-solid fa-gears mr-2 text-amber-400"></i> Pengaturan Identitas & Konfigurasi</h3>
+          <form id="form-custom-identity" onsubmit="handleSaveIdentity(event)" class="space-y-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Judul Utama Aplikasi</label>
+              <input type="text" id="cfg-title" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Sub-Judul Instansi</label>
+              <input type="text" id="cfg-subtitle" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required />
+            </div>
+            <div class="pt-1 border-t border-indigo-500/10 space-y-3">
+              <div>
+                <label class="block text-[10px] font-bold text-indigo-200 mb-1 uppercase">Mesin AI Asisten Utama</label>
+                <select id="cfg-ai-engine" class="w-full bg-indigo-950/60 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none font-bold">
+                  <option value="groq">Groq AI (Llama 3.1 8B) - Super Cepat</option>
+                  <option value="gemini">Gemini AI (2.5 Flash) - Mendalam</option>
+                </select>
+              </div>
+              <div id="wrapper-groq-key">
+                <label class="block text-[10px] font-bold text-indigo-300 mb-1 uppercase"><i class="fa-solid fa-key mr-1 text-orange-400"></i> Groq API Key (Simpan Lokal)</label>
+                <input type="password" id="cfg-groq-key" class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" placeholder="gsk_..." />
+              </div>
+              <div id="wrapper-gemini-key">
+                <label class="block text-[10px] font-bold text-indigo-300 mb-1 uppercase"><i class="fa-solid fa-key mr-1 text-indigo-400"></i> Gemini API Key (Simpan Lokal)</label>
+                <input type="password" id="cfg-gemini-key" class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" placeholder="AIzaSy..." />
+              </div>
+            </div>
+            <div class="flex justify-end pt-2">
+              <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold"><i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Konfigurasi</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="glass-card rounded-2xl p-5 border-t-4 border-indigo-400 flex flex-col justify-between">
+          <div class="space-y-4">
+            <h3 class="font-extrabold text-indigo-200 uppercase text-xs tracking-widest pb-2 border-b border-indigo-500/10 font-semibold"><i class="fa-solid fa-user-plus mr-2 text-indigo-400"></i> Perbarui Kredensial Admin</h3>
+            <form id="form-buat-akun" onsubmit="handleUpdateAdmin(event)" class="space-y-3">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Username Sesi</label>
+                <input type="text" id="reg-user" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Password Sesi Baru</label>
+                <div class="relative">
+                  <input type="password" id="reg-pass" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg pl-3 pr-10 py-2 text-white text-xs focus:outline-none" placeholder="Minimal 6 karakter" required />
+                  <span class="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <i class="fa-solid fa-eye text-indigo-400 cursor-pointer text-xs" onclick="togglePasswordVisibility('reg-pass', this)"></i>
+                  </span>
+                </div>
+              </div>
+              <div class="flex justify-end pt-2">
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold"><i class="fa-solid fa-key mr-1"></i> Simpan Kredensial</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card rounded-2xl p-5 border-t-4 border-emerald-500 mt-6">
+        <h3 class="font-extrabold text-indigo-200 uppercase text-xs tracking-widest pb-2 border-b border-indigo-500/10 flex items-center gap-2 font-semibold">
+          <i class="fa-solid fa-database text-emerald-400"></i> Backup &amp; Restore Database Lokal
+        </h3>
+        <p class="text-[11px] text-slate-300 mt-2 leading-relaxed">Cadangkan seluruh data transaksi logistik IPSRS Anda secara berkala menjadi berkas enkripsi JSON. Anda dapat memulihkannya kembali kapan saja.</p>
+        <div class="flex flex-wrap gap-3 mt-4">
+          <button onclick="exportBackup()" class="px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg"><i class="fa-solid fa-cloud-arrow-down"></i> Cadangkan Database (Backup)</button>
+          <button onclick="triggerRestoreUpload()" class="px-4 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg"><i class="fa-solid fa-cloud-arrow-up"></i> Pulihkan Database (Restore)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB LOGISTIK -->
+    <section id="tab-logistik" class="tab-content hidden space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print glass-card p-4 rounded-2xl border-l-4 border-emerald-500">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-truck-moving text-emerald-400"></i> Logistik IPSRS</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('modal-masuk')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-555 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5"><i class="fa-solid fa-circle-down"></i> Rekam Masuk</button>
+          <button onclick="openModal('modal-keluar')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5"><i class="fa-solid fa-circle-up"></i> Rekam Distribusi</button>
+        </div>
+      </div>
+      <div class="w-full">
+        <div class="flex border-b border-indigo-500/10 mb-4">
+          <button id="sub-btn-masuk" onclick="toggleSubLogistik('masuk')" class="px-5 py-2.5 font-bold text-xs uppercase text-emerald-400 border-b-2 border-emerald-400">Barang Masuk</button>
+          <button id="sub-btn-keluar" onclick="toggleSubLogistik('keluar')" class="px-5 py-2.5 font-bold text-xs uppercase text-slate-400">Barang Keluar</button>
+        </div>
+        <div id="sub-logistik-masuk" class="space-y-4">
+          <div class="glass-card rounded-2xl overflow-hidden w-full border border-indigo-500/10">
+            <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/70 border-b border-indigo-500/10 text-indigo-200 text-xs uppercase font-bold">
+              <tr><th class="px-4 py-4 text-center">No</th><th class="px-4 py-4">ID Transaksi</th><th class="px-4 py-4">Tanggal</th><th class="px-4 py-4">Kode</th><th class="px-4 py-4">Nama Barang</th><th class="px-4 py-4 text-center">Satuan</th><th class="px-4 py-4 text-right">Jumlah Masuk</th><th class="px-4 py-4">Sumber Dana</th><th class="px-4 py-4 text-center no-print">Aksi</th></tr>
+            </thead><tbody id="table-masuk-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+          </div>
+        </div>
+        <div id="sub-logistik-keluar" class="space-y-4 hidden">
+          <div class="glass-card rounded-2xl overflow-hidden w-full border border-indigo-500/10">
+            <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/70 border-b border-indigo-500/10 text-indigo-200 text-xs uppercase font-bold">
+              <tr><th class="px-4 py-4 text-center">No</th><th class="px-4 py-4">Tanggal</th><th class="px-4 py-4">Kode</th><th class="px-4 py-4 text-center">Satuan</th><th class="px-4 py-4 text-right">Jumlah Keluar</th><th class="px-4 py-4">Unit Tujuan</th><th class="px-4 py-4">Penerima</th><th class="px-4 py-4 text-center no-print">Aksi</th></tr>
+            </thead><tbody id="table-keluar-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab Stok Gudang -->
+    <section id="tab-stok" class="tab-content hidden space-y-4">
+      <div class="glass-card p-4 rounded-2xl border-l-4 border-sky-500"><h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-warehouse text-sky-400"></i> Neraca Ketersediaan Stok</h2></div>
+      <div class="w-full bg-indigo-950/10 p-2.5 rounded-2xl border border-indigo-500/10">
+        <p class="text-[10px] text-indigo-300 font-bold mb-2 uppercase tracking-wider">Kategori Barang:</p>
+        <div id="category-scroll-tabs" class="category-scroll-wrapper"></div>
+      </div>
+      <div class="glass-card rounded-2xl overflow-hidden w-full border border-indigo-500/10">
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap" id="table-stok-actual"><thead class="bg-indigo-950/70 border-b border-indigo-500/10 text-indigo-200 text-[11px] uppercase font-bold">
+          <tr><th class="px-4 py-4 text-center">No</th><th class="px-4 py-4">Kode Barang</th><th class="px-4 py-4">Nama Barang</th><th class="px-4 py-4">Kategori</th><th class="px-4 py-4 text-center">Satuan</th><th class="px-4 py-4 text-right">Total Masuk</th><th class="px-4 py-4 text-right">Total Keluar</th><th class="px-4 py-4 text-right bg-indigo-900/10">Sisa Stok</th><th class="px-4 py-4 text-right">Limit Stok</th><th class="px-4 py-4 text-center">Status</th></tr>
+        </thead><tbody id="table-stok-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- Tab Laporan -->
+    <section id="tab-laporan" class="tab-content hidden space-y-6">
+      <div class="sticky-header glass-card p-4 rounded-xl flex items-center justify-between gap-4 border-l-4 border-indigo-500 shadow-2xl">
+        <div class="flex flex-col md:flex-row items-center gap-3 w-full">
+          <div class="text-xs font-black text-indigo-200 uppercase tracking-widest">Filter Periode:</div>
+          <div class="flex items-center gap-2"><input type="date" id="filter-start-date" class="px-3 py-2 text-xs rounded-lg bg-indigo-950/80 border border-indigo-500/30 text-white focus:outline-none" /><span>-</span><input type="date" id="filter-end-date" class="px-3 py-2 text-xs rounded-lg bg-indigo-950/80 border border-indigo-500/30 text-white focus:outline-none" /></div>
+          <button onclick="applyDateFilter()" class="px-5 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-lg">Filter</button>
+          <button onclick="resetDateFilter()" class="px-3 py-2 bg-indigo-950 border border-indigo-500/30 text-indigo-300 text-xs rounded-lg font-bold"><i class="fa-solid fa-arrows-rotate"></i></button>
+        </div>
+      </div>
+
+      <div id="laporan-stok" class="glass-card rounded-2xl p-5 relative">
+        <div class="flex justify-between items-center border-b border-indigo-500/20 pb-3 mb-4">
+           <h3 class="text-sm font-black text-sky-300 uppercase tracking-wider"><i class="fa-solid fa-warehouse"></i> Laporan Stok Gudang</h3>
+           <button onclick="triggerPrint('laporan-stok', 'Laporan Ketersediaan Stok Gudang')" class="bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg no-print"><i class="fa-solid fa-print"></i> Cetak PDF</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/70 border-b border-indigo-500/20 text-indigo-200 text-[11px] uppercase font-bold"><tr><th class="px-4 py-4 text-center">No</th><th class="px-4 py-4">Kode Barang</th><th class="px-4 py-4">Nama Barang</th><th class="px-4 py-4">Kategori</th><th class="px-4 py-4 text-center">Satuan</th><th class="px-4 py-4 text-right">Total Masuk</th><th class="px-4 py-4 text-right">Total Keluar</th><th class="px-4 py-4 text-right bg-indigo-900/20">Sisa Stok</th><th class="px-4 py-4 text-right">Limit Stok</th><th class="px-4 py-4 text-center">Status</th></tr></thead><tbody id="table-laporan-stok-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+      </div>
+
+      <div id="laporan-mutasi" class="glass-card rounded-2xl p-5 relative">
+        <div class="flex justify-between items-center border-b border-indigo-500/20 pb-3 mb-4">
+          <div class="flex items-center gap-3">
+             <h3 class="text-sm font-black text-amber-300 uppercase tracking-wider"><i class="fa-solid fa-hospital"></i> Laporan Mutasi Unit</h3>
+             <select id="filter-mutasi-unit" onchange="renderLaporanMutasiUnitTable()" class="bg-indigo-950/60 border border-indigo-500/30 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none no-print"></select>
+          </div>
+          <button onclick="triggerPrint('laporan-mutasi', 'Laporan Mutasi Unit Kerja')" class="bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg no-print"><i class="fa-solid fa-print"></i> Cetak PDF</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/40 text-indigo-200 text-[10px] uppercase font-bold border-b border-indigo-500/20"><tr><th class="px-4 py-3 text-center w-12">No</th><th class="px-4 py-3">Unit Kerja Tujuan</th><th class="px-4 py-3">Nama Barang Disalurkan</th><th class="px-4 py-3 text-right">Total Disalurkan</th><th class="px-4 py-3 text-center">Satuan</th></tr></thead><tbody id="table-mutasi-unit-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+      </div>
+
+      <div id="laporan-masuk" class="glass-card rounded-2xl p-5 relative">
+        <div class="flex justify-between items-center border-b border-indigo-500/20 pb-3 mb-4">
+           <h3 class="text-sm font-black text-emerald-400 uppercase tracking-wider">Rincian Barang Masuk</h3>
+           <button onclick="triggerPrint('laporan-masuk', 'Laporan Rincian Barang Masuk')" class="bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg no-print"><i class="fa-solid fa-print"></i> Cetak PDF</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/40 text-indigo-200 text-[10px] uppercase font-bold border-b border-indigo-500/20"><tr><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Nama Barang</th><th class="px-4 py-3 text-right">Jumlah Barang</th><th class="px-4 py-3 text-center">Satuan</th></tr></thead><tbody id="table-laporan-masuk-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+      </div>
+
+      <div id="laporan-keluar" class="glass-card rounded-2xl p-5 relative">
+        <div class="flex justify-between items-center border-b border-indigo-500/20 pb-3 mb-4">
+           <h3 class="text-sm font-black text-rose-400 uppercase tracking-wider">Rincian Barang Keluar</h3>
+           <button onclick="triggerPrint('laporan-keluar', 'Laporan Rincian Barang Keluar')" class="bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg no-print"><i class="fa-solid fa-print"></i> Cetak PDF</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-indigo-950/40 text-indigo-200 text-[10px] uppercase font-bold border-b border-indigo-500/20"><tr><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Nama Barang</th><th class="px-4 py-3 text-right">Jumlah Keluar</th><th class="px-4 py-3 text-center">Satuan</th></tr></thead><tbody id="table-laporan-keluar-body" class="divide-y divide-indigo-950/20 text-xs"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- Tab Chat AI -->
+    <section id="tab-bot" class="tab-content hidden h-full">
+      <div class="glass-card rounded-2xl p-5 flex flex-col h-[75vh] md:h-[80vh] border border-indigo-500/10 relative">
+        <div class="flex items-center gap-4 border-b border-indigo-500/10 pb-4 mb-4">
+          <div class="h-12 w-12 rounded-xl bg-indigo-600/20 flex items-center justify-center text-indigo-400"><i class="fa-solid fa-robot text-2xl animate-bounce"></i></div>
+          <div>
+            <h3 class="text-lg font-black text-indigo-100">Asisten AI IPSRS RSUD Sinjai</h3>
+            <p class="text-[10px] text-emerald-400 font-bold tracking-wide flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span> Terkoneksi Database Live</p>
+          </div>
+        </div>
+        <div id="chat-conversation" class="flex-1 overflow-y-auto space-y-4 p-4 rounded-xl bg-black/20 border border-indigo-900/10 flex flex-col mb-4">
+          <div class="bg-indigo-950/60 p-3 rounded-2xl border border-indigo-800/20 text-gray-200 max-w-[85%] text-xs shadow-md">Halo! Saya Asisten AI Inventaris IPSRS RSUD Sinjai. Silakan tanyakan stok barang Anda!</div>
+        </div>
+        <form onsubmit="handleSendChat(event)" class="flex gap-2 relative mt-auto">
+          <input id="chat-input" type="text" placeholder="Tanyakan kondisi stok atau laporan barang..." class="flex-1 bg-indigo-950/50 border border-indigo-500/30 rounded-xl px-4 py-3 text-white focus:outline-none text-sm" required autocomplete="off" />
+          <button type="submit" class="px-5 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"><i class="fa-solid fa-paper-plane"></i></button>
+        </form>
+      </div>
+    </section>
+
+    <footer class="mt-8 mb-4 border-t border-indigo-500/10 pt-4 text-center shrink-0 w-full"><p class="text-[10px] text-indigo-300/40 tracking-wider font-semibold">SISFO STOK BARANG IPSRS RSUD SINJAI © 2026 BY PARTNER CODING</p></footer>
+  </main>
+
+  <div id="toast-notif" class="fixed top-6 right-6 md:bottom-10 md:right-10 md:top-auto px-5 py-3 rounded-xl shadow-2xl border transition-all duration-300 transform -translate-y-20 md:translate-y-20 opacity-0 z-50 flex items-center gap-3">
+    <div id="toast-icon"></div><div id="toast-message" class="text-xs font-bold tracking-wide"></div>
+  </div>
+
+  <div id="modal-auth-gate" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 border border-indigo-500/20 transform scale-95 transition-all duration-200" id="modal-gate-body">
+      <div class="flex flex-col items-center justify-center text-center gap-3 mb-6"><div class="h-12 w-12 bg-indigo-500/15 text-indigo-400 rounded-xl flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-shield-halved"></i></div><div><h3 class="text-sm font-black text-indigo-300 uppercase tracking-widest">Verifikasi Sesi</h3><p class="text-[10px] text-indigo-200/70 mt-1 font-medium">Sesi belum diverifikasi. Masukkan kredensial admin Anda.</p></div></div>
+      <form onsubmit="handleGateLogin(event)" class="space-y-4">
+        <div><label class="block text-[9px] font-bold text-slate-300 mb-1 uppercase">Username</label><input type="text" id="gate-user" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none font-medium" required /></div>
+        <div><label class="block text-[9px] font-bold text-slate-300 mb-1 uppercase">Password</label><div class="relative"><input type="password" id="gate-pass" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg pl-3 pr-10 py-2 text-white text-xs focus:outline-none font-medium" required /><span class="absolute inset-y-0 right-0 flex items-center pr-3"><i class="fa-solid fa-eye text-indigo-400 cursor-pointer text-xs" onclick="togglePasswordVisibility('gate-pass', this)"></i></span></div></div>
+        <div class="flex gap-2 pt-2"><button type="button" onclick="cancelAuthGate()" class="flex-1 px-4 py-2 bg-indigo-950/60 rounded-lg text-xs font-bold text-slate-300">Batal</button><button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold transition-all">Verifikasi</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-master" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 border border-indigo-500/20 transform scale-95 transition-all duration-200" id="modal-m-body">
+      <div class="flex items-center justify-between border-b border-indigo-500/10 pb-3 mb-4"><h3 class="text-sm font-black text-amber-400 uppercase tracking-widest"><i class="fa-solid fa-plus-circle"></i> Tambah Referensi</h3><button onclick="closeModal('modal-master')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+      <form onsubmit="handleFormSubmission(event, 'MASTER_REFERENSI', 'modal-master')" class="space-y-4">
+        <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Jenis Data</label><input type="text" name="jenis" id="master-jenis-input" class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-lg px-3 py-2.5 text-indigo-300 text-xs font-bold cursor-not-allowed" readonly/></div>
+        <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Nama Baru</label><input type="text" name="nilai" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2.5 text-white text-xs focus:outline-none" required autocomplete="off"/></div>
+        <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="closeModal('modal-master')" class="px-4 py-2 bg-indigo-950/60 rounded-lg text-xs font-bold text-slate-300">Batal</button><button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold">Simpan</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-masuk" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-emerald-500/20 transform scale-95 transition-all duration-200" id="modal-in-body">
+      <div class="flex items-center justify-between border-b border-indigo-500/10 pb-3 mb-4"><h3 class="text-sm font-black text-emerald-400 uppercase tracking-widest"><i class="fa-solid fa-circle-down"></i> Transaksi Barang Masuk</h3><button onclick="closeModal('modal-masuk')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+      <form id="form-barang-masuk" onsubmit="handleFormSubmission(event, 'BARANG_MASUK', 'modal-masuk')" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">ID Transaksi (Auto)</label><input type="text" name="id_masuk" id="masuk_id_masuk" readonly class="w-full bg-black/20 border border-indigo-500/10 rounded-lg px-3 py-2 text-indigo-400 text-xs font-bold"/></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Tanggal</label><input type="date" name="tanggal" id="masuk_tanggal" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+        </div>
+        <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Nama Barang (Lama/Baru)</label><input type="text" name="nama_barang" list="list-barang-gudang" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2.5 text-white text-xs focus:outline-none" required autocomplete="off"/><datalist id="list-barang-gudang"></datalist></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Kategori</label><select name="kategori" id="select-kategori" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required></select></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Satuan</label><select name="satuan" id="select-satuan" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required></select></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Jumlah</label><input type="number" name="jumlah" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" min="1" required /></div>
+          <div><label class="block text-[10px] font-bold text-amber-300 mb-1 uppercase">Limit Stok Minimal</label><input type="number" name="limit_stok" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Sumber Dana</label><input type="text" name="sumber_dana" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Keterangan Opsional</label><input type="text" name="keterangan" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" /></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="closeModal('modal-masuk')" class="px-4 py-2 bg-indigo-950/60 rounded-lg text-xs font-bold text-slate-300">Batal</button><button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold">Simpan</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-edit-masuk" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-yellow-500/20 transform scale-95 transition-all duration-200" id="modal-edit-body">
+      <div class="flex items-center justify-between border-b border-indigo-500/10 pb-3 mb-4"><h3 class="text-sm font-black text-yellow-400 uppercase tracking-widest"><i class="fa-solid fa-edit"></i> Edit Barang Masuk</h3><button onclick="closeModal('modal-edit-masuk')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+      <form onsubmit="handleEditMasukSubmission(event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">ID Transaksi</label><input type="text" name="id_masuk" id="edit_id_masuk" readonly class="w-full bg-black/20 border border-indigo-500/10 rounded-lg px-3 py-2 text-yellow-400 text-xs font-bold"/></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Tanggal</label><input type="date" name="tanggal" id="edit_tanggal" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Kode Barang</label><input type="text" name="id_barang" id="edit_id_barang" readonly class="w-full bg-black/20 border border-indigo-500/10 rounded-lg px-3 py-2 text-indigo-300 text-xs font-bold"/></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Nama Barang</label><input type="text" name="nama_barang" id="edit_nama_barang" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required/></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Kategori</label><select name="kategori" id="edit_kategori" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required></select></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Satuan</label><select name="satuan" id="edit_satuan" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required></select></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Jumlah</label><input type="number" name="jumlah" id="edit_jumlah" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" min="1" required /></div>
+          <div><label class="block text-[10px] font-bold text-amber-300 mb-1 uppercase">Limit Stok Minimal</label><input type="number" name="limit_stok" id="edit_limit" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Sumber Dana</label><input type="text" name="sumber_dana" id="edit_sumber" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Keterangan</label><input type="text" name="keterangan" id="edit_keterangan" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" /></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="closeModal('modal-edit-masuk')" class="px-4 py-2 bg-indigo-950/60 rounded-lg text-xs font-bold text-slate-300">Batal</button><button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg text-xs font-bold">Simpan</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-keluar" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-rose-500/20 transform scale-95 transition-all duration-200" id="modal-out-body">
+      <div class="flex items-center justify-between border-b border-indigo-500/10 pb-3 mb-4"><h3 class="text-sm font-black text-rose-400 uppercase tracking-widest"><i class="fa-solid fa-circle-up"></i> Distribusi Barang Keluar</h3><button onclick="closeModal('modal-keluar')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+      <form id="form-barang-keluar" onsubmit="handleBarangKeluarFormSubmit(event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">ID Transaksi</label><input type="text" name="id_keluar" id="keluar_id_keluar" readonly class="w-full bg-black/20 border border-indigo-500/10 rounded-lg px-3 py-2 text-indigo-400 text-xs font-bold"/></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Tanggal Keluar</label><input type="date" name="tanggal" id="keluar_tanggal" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required /></div>
+        </div>
+        <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Pilih Barang dari Gudang</label><select id="keluar_id_barang" name="id_barang" onchange="handleBarangKeluarSelectChange(this.value)" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2.5 text-white text-xs focus:outline-none" required></select><input type="hidden" name="nama_barang" id="keluar_nama_barang" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Jumlah Keluar</label><input type="number" id="keluar_jumlah" name="jumlah" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" min="1" required /></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Satuan Barang</label><input type="text" id="keluar_satuan" name="satuan" readonly class="w-full bg-black/20 border border-indigo-500/10 rounded-lg px-3 py-2 text-indigo-300 text-xs font-medium" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Unit Kerja Tujuan</label><select name="unit_kerja" id="select-unit-kerja" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required></select></div>
+          <div><label class="block text-[10px] font-bold text-slate-300 mb-1 uppercase">Nama Penerima</label><input type="text" name="penerima" class="w-full bg-black/40 border border-indigo-500/30 rounded-lg px-3 py-2 text-white text-xs focus:outline-none" required autocomplete="off"/></div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="closeModal('modal-keluar')" class="px-4 py-2 bg-indigo-950/60 rounded-lg text-xs font-bold text-slate-300">Batal</button><button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-bold">Keluarkan</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-confirm" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden items-center justify-center p-4 z-50 modal-backdrop">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 border border-indigo-500/20 text-center space-y-4">
+      <div class="h-12 w-12 bg-rose-500/10 text-rose-400 rounded-full flex items-center justify-center text-xl mx-auto"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h3 class="text-sm font-black text-white uppercase tracking-wide">Konfirmasi Hapus</h3>
+      <p id="modal-confirm-text" class="text-xs text-indigo-200"></p>
+      <div class="flex gap-2 pt-2">
+        <button id="btn-confirm-cancel" class="flex-1 px-4 py-2 bg-indigo-950 text-indigo-300 text-xs font-bold rounded-lg border border-indigo-500/10">Batal</button>
+        <button id="btn-confirm-ok" class="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg">Hapus Permanen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT UTAMA SUPABASE -->
+  <script>
+    // =========================================================================
+    // INISIALISASI SUPABASE KLIEN (MENGGUNAKAN NAMA INDEPENDEN UNTUK CEGAH KONFLIK)
+    // =========================================================================
+    const supabaseUrl = 'https://gyyvqoxlkbjrzwvmyoam.supabase.co';
+    const supabaseKey = 'sb_publishable_6v1zw9GoQtJGlXbyE3dl5Q_8zl2I_wc';
+    const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+    
+    // API KEY GROQ DEFAULT (Sesuai Permintaan Kakak)
+    var defaultGroqKey = "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";
+    
+    var state = { referensi: [], barang_masuk: [], barang_keluar: [], stok_gudang: [], app_title: "SISFO STOK BARANG IPSRS", app_subtitle: "RSUD SINJAI - SULAWESI SELATAN" };
+    var filteredMasuk = [], filteredKeluar = [];
+    var globalStartDate = '', globalEndDate = '';
+    var selectedCategoryFilter = localStorage.getItem('selectedCategoryFilter') || "Semua Kategori";
+    var myPieChart = null;
+    var pendingTab = ''; 
+    var fallbackInterval = null; // Menampung interval polling
+
+    // On Load Window Event
+    window.onload = function() {
+      try {
+        initDatabase();
+        applyCustomIdentity();
+        
+        // Memulai Koneksi Realtime Supabase
+        initSupabaseRealtime();
+      } catch(e) {}
+
+      // Live clock
+      setInterval(function() {
+        try {
+          var liveClock = document.getElementById('live-clock');
+          if (liveClock) liveClock.innerText = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
+        } catch(e) {}
+      }, 1000);
+
+      try {
+        updateAuthStatusBadge();
+        var selectAi = document.getElementById('cfg-ai-engine');
+        if (selectAi) selectAi.addEventListener('change', adjustAiInputVisibility);
+        
+        var activeTab = localStorage.getItem('activeTab') || 'tab-dashboard';
+        showTab(activeTab);
+        refreshAllData(); 
+      } catch(e) {}
+    };
+
+    // Fungsi Inisialisasi Backup Lokal / Mode Demo (Sebagai Fallback)
+    function initDatabase() {
+      var savedState = localStorage.getItem('ipsrs_stock_state_v2');
+      if (savedState) {
+        try {
+          state = JSON.parse(savedState);
+        } catch (e) {
+          resetToDefaultState();
+        }
+      } else {
+        resetToDefaultState();
+      }
+      
+      state.referensi = state.referensi || [];
+      state.barang_masuk = state.barang_masuk || [];
+      state.barang_keluar = state.barang_keluar || [];
+      state.stok_gudang = state.stok_gudang || [];
+    }
+
+    function resetToDefaultState() {
+      state.referensi = [];
+      state.barang_masuk = []; state.barang_keluar = [];
+      calculateStokGudang(); 
+      saveDatabase();
+    }
+
+    function saveDatabase() { 
+      localStorage.setItem('ipsrs_stock_state_v2', JSON.stringify(state)); 
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI KOMUNIKASI SUPABASE
+    // -------------------------------------------------------------
+
+    function updateConnectionBadge(status, errorMsg = "") {
+      var badge = document.getElementById('connection-status-badge'); 
+      if (!badge) return;
+      if (status === "demo") {
+        badge.className = "mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 justify-center cursor-default";
+        badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span> Mode Demo Lokal';
+      } else if (status === "connecting") {
+        badge.className = "mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 inline-flex items-center gap-1.5 justify-center cursor-default";
+        badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-sky-400 animate-spin"></span> Menghubungkan...';
+      } else if (status === "online") {
+        badge.className = "mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1.5 justify-center cursor-default";
+        badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> Supabase Terhubung';
+      } else if (status === "online_polling") {
+        badge.className = "mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 inline-flex items-center gap-1.5 justify-center cursor-default";
+        badge.innerHTML = '<span class="h-2 w-2 rounded-full bg-teal-400 animate-pulse"></span> Supabase (HTTP Polling)';
+      } else {
+        badge.className = "mt-3 text-[9px] font-bold px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 inline-flex flex-col gap-1 items-center justify-center p-2.5 text-center max-w-[240px]";
+        var msg = errorMsg ? errorMsg : "Koneksi Terputus";
+        var html = '<span class="flex items-center gap-1.5 font-bold"><span class="h-2 w-2 rounded-full bg-rose-500 shrink-0"></span> Gagal Koneksi</span>';
+        html += '<span class="text-[8px] opacity-80 leading-tight block mt-1 border-t border-rose-500/20 pt-1 text-rose-200">' + msg + '</span>';
+        badge.innerHTML = html;
+      }
+    }
+
+    // SAKTI: Fungsi uji kelayakan WebSocket untuk mencegah SecurityError di dalam iframe Canvas sandbox
+    function isWebSocketAllowed() {
+      if (typeof window.WebSocket === 'undefined') return false;
+      try {
+        // Coba instansiasi WebSocket secara synchronous, jika diblokir oleh sandbox maka akan melempar SecurityError
+        const testWS = new WebSocket("wss://gyyvqoxlkbjrzwvmyoam.supabase.co/realtime/v1/websocket");
+        testWS.close();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Menggantikan WebSockets Cloudflare dengan Supabase Realtime Channels yang aman dari restriksi sandbox
+    function initSupabaseRealtime() {
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      
+      updateConnectionBadge("connecting");
+      
+      // Jika WebSocket diblokir (di dalam Canvas), gunakan fallback HTTP Polling otomatis tanpa melempar SecurityError
+      if (!isWebSocketAllowed()) {
+        console.warn("Jaringan WebSocket dibatasi di lingkungan ini (Iframe Canvas Sandbox). Mengaktifkan fallback HTTP Polling otomatis.");
+        updateConnectionBadge("online_polling");
+        fallbackInterval = setInterval(function() {
+          refreshAllData(true);
+        }, 5000); // Sinkronisasi setiap 5 detik secara sunyi
+        return;
+      }
+      
+      try {
+        const channel = supabaseClient.channel('ipsrs-public-changes');
+        
+        channel
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'referensi' }, payload => {
+            refreshAllData(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_masuk' }, payload => {
+            refreshAllData(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_keluar' }, payload => {
+            refreshAllData(true);
+          })
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              updateConnectionBadge("online");
+            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              updateConnectionBadge("error", "Koneksi Realtime Terputus");
+            }
+          });
+      } catch (e) {
+        updateConnectionBadge("error", e.message);
+      }
+    }
+
+    async function refreshAllData(silent = false) {
+      if (!silent) showSyncOverlay();
+      try {
+        const [resRef, resMasuk, resKeluar] = await Promise.all([
+          supabaseClient.from('referensi').select('*').order('jenis', { ascending: true }),
+          supabaseClient.from('barang_masuk').select('*').order('tanggal', { ascending: false }),
+          supabaseClient.from('barang_keluar').select('*').order('tanggal', { ascending: false })
+        ]);
+
+        if (resRef.error) throw resRef.error;
+        if (resMasuk.error) throw resMasuk.error;
+        if (resKeluar.error) throw resKeluar.error;
+        
+        state.referensi = resRef.data || []; 
+        state.barang_masuk = resMasuk.data || []; 
+        state.barang_keluar = resKeluar.data || [];
+        
+        calculateStokGudang();
+        saveDatabase(); 
+        
+        // Mempertahankan badge tetap 'online_polling' jika sedang dalam mode fallback
+        if (!isWebSocketAllowed()) {
+          updateConnectionBadge("online_polling");
+        } else {
+          updateConnectionBadge("online");
+        }
+      } catch (err) {
+        // Fallback otomatis ke data lokal jika terjadi eror cloud
+        var local = localStorage.getItem('ipsrs_stock_state_v2');
+        if (local) {
+          try {
+            var parsed = JSON.parse(local);
+            state.referensi = parsed.referensi || [];
+            state.barang_masuk = parsed.barang_masuk || [];
+            state.barang_keluar = parsed.barang_keluar || [];
+          } catch(e) {}
+        }
+        calculateStokGudang();
+        updateConnectionBadge("error", err.message);
+      }
+
+      try {
+        renderMasterReferensi(state.referensi);
+        renderBarangMasukTable(state.barang_masuk);
+        renderBarangKeluarTable(state.barang_keluar);
+        renderCategoryScrollMenu(); 
+        renderStokTable(state.stok_gudang);
+        populateDatalistBarang(state.stok_gudang);
+        populateBarangKeluarDropdown(state.stok_gudang);
+        populateUnitDropdown();
+        applyDateFilter(true);
+        updateDashboardStats();
+      } catch (renderError) {
+      } finally {
+        if (!silent) {
+          hideSyncOverlay();
+        }
+      }
+    }
+
+    function calculateStokGudang() {
+      state.stok_gudang = []; 
+      var mapStok = {};
+      
+      (state.barang_masuk || []).forEach(function(m) {
+        var id = m.id_barang;
+        if (!mapStok[id]) { 
+          mapStok[id] = { id_barang: id, nama_barang: m.nama_barang, kategori: m.kategori, satuan: m.satuan, stok_masuk: 0, stok_keluar: 0, sisa_stok: 0, stok_minimal: Number(m.limit_stok) || 5, status: "Aman" }; 
+        }
+        mapStok[id].stok_masuk += Number(m.jumlah) || 0;
+        mapStok[id].stok_minimal = Number(m.limit_stok) || mapStok[id].stok_minimal;
+      });
+      
+      (state.barang_keluar || []).forEach(function(k) {
+        var id = k.id_barang;
+        if (mapStok[id]) mapStok[id].stok_keluar += Number(k.jumlah) || 0;
+      });
+      
+      Object.keys(mapStok).forEach(function(id) {
+        var item = mapStok[id];
+        item.sisa_stok = item.stok_masuk - item.stok_keluar;
+        item.status = item.sisa_stok <= item.stok_minimal ? "Stok Kritis" : "Aman";
+        state.stok_gudang.push(item);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // PENGATURAN IDENTITAS DAN AI
+    // -------------------------------------------------------------
+    function applyCustomIdentity() {
+      var savedTitle = localStorage.getItem('app_title') || state.app_title;
+      var savedSubtitle = localStorage.getItem('app_subtitle') || state.app_subtitle;
+      
+      document.querySelectorAll('.app-title-text').forEach(function(el) { el.innerText = savedTitle; });
+      document.querySelectorAll('.app-subtitle-text').forEach(function(el) { el.innerText = savedSubtitle; });
+      
+      if (document.getElementById('cfg-title')) document.getElementById('cfg-title').value = savedTitle;
+      if (document.getElementById('cfg-subtitle')) document.getElementById('cfg-subtitle').value = savedSubtitle;
+      
+      if (document.getElementById('cfg-gemini-key')) document.getElementById('cfg-gemini-key').value = localStorage.getItem('ipsrs_gemini_key') || "";
+      // Menggunakan fallback kunci Groq default jika belum diset secara lokal
+      if (document.getElementById('cfg-groq-key')) document.getElementById('cfg-groq-key').value = localStorage.getItem('ipsrs_groq_key') || defaultGroqKey;
+      if (document.getElementById('cfg-ai-engine')) document.getElementById('cfg-ai-engine').value = localStorage.getItem('ipsrs_ai_engine') || "groq";
+      adjustAiInputVisibility();
+    }
+
+    function adjustAiInputVisibility() {
+      var select = document.getElementById('cfg-ai-engine');
+      var g = document.getElementById('wrapper-groq-key');
+      var j = document.getElementById('wrapper-gemini-key');
+      if(!select || !g || !j) return;
+      if(select.value === 'groq') { g.style.display='block'; j.style.display='none'; }
+      else { g.style.display='none'; j.style.display='block'; }
+    }
+
+    function handleSaveIdentity(event) {
+      event.preventDefault();
+      localStorage.setItem('app_title', document.getElementById('cfg-title').value);
+      localStorage.setItem('app_subtitle', document.getElementById('cfg-subtitle').value);
+      localStorage.setItem('ipsrs_gemini_key', document.getElementById('cfg-gemini-key').value);
+      localStorage.setItem('ipsrs_groq_key', document.getElementById('cfg-groq-key').value);
+      localStorage.setItem('ipsrs_ai_engine', document.getElementById('cfg-ai-engine').value);
+      
+      saveDatabase(); 
+      applyCustomIdentity(); 
+      
+      showToast("Konfigurasi tersimpan!", "success");
+    }
+
+    function togglePasswordVisibility(id, icon) {
+      var el = document.getElementById(id);
+      if(el.type==='password') { el.type='text'; icon.className='fa-solid fa-eye-slash'; }
+      else { el.type='password'; icon.className='fa-solid fa-eye'; }
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI NAVIGASI & MODAL
+    // -------------------------------------------------------------
+
+    function openAuthGate() {
+      var m = document.getElementById('modal-auth-gate');
+      if (m) {
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        setTimeout(function() {
+          var body = document.getElementById('modal-gate-body');
+          if (body) body.classList.replace('scale-95', 'scale-100');
+        }, 10);
+      }
+    }
+
+    function cancelAuthGate() {
+      var body = document.getElementById('modal-gate-body');
+      if (body) body.classList.replace('scale-100', 'scale-95');
+      setTimeout(function() {
+        var m = document.getElementById('modal-auth-gate');
+        if (m) {
+          m.classList.add('hidden');
+          m.classList.remove('flex');
+        }
+        showTab('tab-dashboard');
+        pendingTab = '';
+      }, 200);
+    }
+
+    function handleGateLogin(event) {
+      event.preventDefault();
+      var user = document.getElementById('gate-user').value;
+      var pass = document.getElementById('gate-pass').value;
+      var adminCreds = getAdminCredentials();
+      
+      if (user === adminCreds.username && pass === adminCreds.password) {
+        sessionStorage.setItem('is_ipsrs_auth', 'true');
+        var body = document.getElementById('modal-gate-body');
+        if (body) body.classList.replace('scale-100', 'scale-95');
+        setTimeout(function() {
+          var m = document.getElementById('modal-auth-gate');
+          if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+          showToast("Akses Terverifikasi!", "success");
+          updateAuthStatusBadge();
+          if (pendingTab) { showTab(pendingTab); pendingTab = ''; }
+        }, 200);
+      } else { 
+        showToast("Username atau Password Salah!", "error"); 
+      }
+      document.getElementById('gate-user').value = ''; 
+      document.getElementById('gate-pass').value = '';
+    }
+
+    // SAKTI: PROSES LOGOUT ADMIN PENUH TANPA MEMUTUS KONEKSI SUPABASE
+    function handleLogout() {
+      sessionStorage.removeItem('is_ipsrs_auth');
+      showToast("Sesi akses admin dikunci.", "info");
+      updateAuthStatusBadge(); 
+      showTab('tab-dashboard');
+      
+      // Menguji & membuktikan database Supabase tetap aktif berjalan di publik
+      refreshAllData(true); 
+    }
+
+    // MEMASTIKAN LOGIN HARUS 'Ipsrs123' DAN '123Ipsrs'
+    function getAdminCredentials() {
+      var saved = localStorage.getItem('ipsrs_admin_creds');
+      if (saved) return JSON.parse(saved);
+      return { username: 'Ipsrs123', password: '123Ipsrs' };
+    }
+
+    function handleUpdateAdmin(event) {
+      event.preventDefault();
+      var user = document.getElementById('reg-user').value.trim();
+      var pass = document.getElementById('reg-pass').value.trim();
+      if (pass.length < 6) { showToast("Password minimal 6 karakter!", "error"); return; }
+      localStorage.setItem('ipsrs_admin_creds', JSON.stringify({ username: user, password: pass }));
+      showToast("Kredensial administrator berhasil diperbarui!", "success");
+      document.getElementById('form-buat-akun').reset();
+    }
+
+    function updateAuthStatusBadge() {
+      var isAuth = sessionStorage.getItem('is_ipsrs_auth') === 'true';
+      var badgeMobile = document.getElementById('auth-status-badge-mobile');
+      if (badgeMobile) {
+        if (isAuth) {
+          badgeMobile.innerText = "Terverifikasi Sesi";
+          badgeMobile.className = "text-[9px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        } else {
+          badgeMobile.innerText = "Belum Verifikasi";
+          badgeMobile.className = "text-[9px] font-extrabold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30";
+        }
+      }
+    }
+
+    function showTab(tabId) {
+      if (tabId === 'tab-master' || tabId === 'tab-logistik') {
+        if (sessionStorage.getItem('is_ipsrs_auth') !== 'true') { 
+          pendingTab = tabId; 
+          openAuthGate(); 
+          return; 
+        }
+      }
+      document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.add('hidden'); });
+      var target = document.getElementById(tabId);
+      if (target) target.classList.remove('hidden');
+      
+      document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active-tab'); });
+      var btn = document.getElementById('btn-' + tabId);
+      if (btn) btn.classList.add('active-tab');
+      
+      localStorage.setItem('activeTab', tabId);
+      if(tabId === 'tab-laporan') applyDateFilter(true);
+    }
+
+    function toggleSubLogistik(type) {
+      var bm = document.getElementById('sub-btn-masuk'); var bk = document.getElementById('sub-btn-keluar');
+      var vm = document.getElementById('sub-logistik-masuk'); var vk = document.getElementById('sub-logistik-keluar');
+      if (type === 'masuk') {
+        bm.className = "px-5 py-2.5 font-bold text-xs uppercase text-emerald-400 border-b-2 border-emerald-400";
+        bk.className = "px-5 py-2.5 font-bold text-xs uppercase text-slate-400";
+        vm.classList.remove('hidden'); vk.classList.add('hidden');
+      } else {
+        bk.className = "px-5 py-2.5 font-bold text-xs uppercase text-rose-400 border-b-2 border-rose-400";
+        bm.className = "px-5 py-2.5 font-bold text-xs uppercase text-slate-400";
+        vk.classList.remove('hidden'); vm.classList.add('hidden');
+      }
+    }
+
+    function openModal(modalId) {
+      var m = document.getElementById(modalId);
+      if (m) {
+        m.classList.remove('hidden'); m.classList.add('flex');
+        var bodyId = modalId === 'modal-master' ? 'modal-m-body' : (modalId === 'modal-masuk' ? 'modal-in-body' : (modalId === 'modal-edit-masuk' ? 'modal-edit-body' : 'modal-out-body'));
+        var body = document.getElementById(bodyId);
+        if (body) setTimeout(function() { body.classList.replace('scale-95', 'scale-100'); }, 10);
+        
+        var today = new Date().toISOString().split('T')[0];
+        if (modalId === 'modal-masuk') { 
+          if(document.getElementById('masuk_id_masuk')) document.getElementById('masuk_id_masuk').value = 'IN-' + Math.floor(1000 + Math.random() * 9000); 
+          if(document.getElementById('masuk_tanggal')) document.getElementById('masuk_tanggal').value = today; 
+        } else if (modalId === 'modal-keluar') { 
+          if(document.getElementById('keluar_id_keluar')) document.getElementById('keluar_id_keluar').value = 'OUT-' + Math.floor(1000 + Math.random() * 9000); 
+          if(document.getElementById('keluar_tanggal')) document.getElementById('keluar_tanggal').value = today; 
+        }
+      }
+    }
+
+    function closeModal(modalId) {
+      var bodyId = modalId === 'modal-master' ? 'modal-m-body' : (modalId === 'modal-masuk' ? 'modal-in-body' : (modalId === 'modal-edit-masuk' ? 'modal-edit-body' : 'modal-out-body'));
+      var body = document.getElementById(bodyId);
+      if (body) body.classList.replace('scale-100', 'scale-95');
+      setTimeout(function() {
+        var m = document.getElementById(modalId);
+        if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+      }, 200);
+    }
+
+    // Modal Master
+    function openModalMaster(jenis) {
+      var input = document.getElementById('master-jenis-input');
+      if (input) input.value = jenis;
+      openModal('modal-master');
+    }
+
+    function openEditMasuk(idMasuk) {
+      var item = state.barang_masuk.find(function(m) { return m.id_masuk === idMasuk; });
+      if (!item) { showToast("Data tidak ditemukan!", "error"); return; }
+      document.getElementById('edit_id_masuk').value = item.id_masuk || '';
+      document.getElementById('edit_tanggal').value = item.tanggal || '';
+      document.getElementById('edit_id_barang').value = item.id_barang || '';
+      document.getElementById('edit_nama_barang').value = item.nama_barang || '';
+      document.getElementById('edit_kategori').value = item.kategori || '';
+      document.getElementById('edit_satuan').value = item.satuan || '';
+      document.getElementById('edit_jumlah').value = item.jumlah || 0;
+      document.getElementById('edit_limit').value = item.limit_stok || 0;
+      document.getElementById('edit_sumber').value = item.sumber_dana || '';
+      document.getElementById('edit_keterangan').value = item.keterangan || '';
+      openModal('modal-edit-masuk');
+    }
+
+    function showSyncOverlay() {
+      var overlay = document.getElementById('sync-overlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
+
+    function hideSyncOverlay() {
+      var overlay = document.getElementById('sync-overlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+
+    function showToast(message, type = "success") {
+      var toast = document.getElementById('toast-notif'); if (!toast) return;
+      var toastMsg = document.getElementById('toast-message');
+      var toastIcon = document.getElementById('toast-icon');
+      if (toastMsg) toastMsg.innerText = message;
+      if (toastIcon) {
+        toastIcon.innerHTML = type === "success" ? '<i class="fa-solid fa-circle-check text-xl"></i>' : (type === "error" ? '<i class="fa-solid fa-circle-xmark text-xl"></i>' : '<i class="fa-solid fa-circle-info text-xl"></i>');
+      }
+      toast.className = 'fixed top-6 right-6 md:bottom-10 md:right-10 md:top-auto px-5 py-3 rounded-xl shadow-2xl border transition-all duration-300 transform z-50 flex items-center gap-3 ' + (type === 'success' ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200' : (type === 'error' ? 'bg-rose-950/90 border-rose-500/40 text-rose-200' : 'bg-indigo-950/90 border-indigo-500/40 text-indigo-200'));
+      toast.classList.remove('-translate-y-20', 'md:translate-y-20', 'opacity-0');
+      setTimeout(function() { toast.classList.add('-translate-y-20', 'md:translate-y-20', 'opacity-0'); }, 4000);
+    }
+
+    function triggerPrint(sectionId, title) {
+      if (!sectionId) { window.print(); return; }
+      var target = document.getElementById(sectionId);
+      if (!target) { showToast('Section Laporan tidak ditemukan', 'error'); return; }
+      var pDateText = "Seluruh Data Sampai Saat Ini";
+      if (globalStartDate || globalEndDate) {
+        var sd = globalStartDate ? new Date(globalStartDate).toLocaleDateString('id-ID') : 'Awal';
+        var ed = globalEndDate ? new Date(globalEndDate).toLocaleDateString('id-ID') : 'Sekarang';
+        pDateText = sd + " s/d " + ed;
+      }
+      var printContent = '<html><head><title>' + title + '</title><style>body{ font-family: Arial, sans-serif; padding:20px; color:#000; }.kop{ text-align:center; border-bottom:3px solid #000; padding-bottom:15px; margin-bottom:25px; }.kop h1{ margin:0; font-size:22px; } .kop h2{ margin:5px 0; font-size:16px; } .kop p{ margin:0; font-size:12px; }.judul{ text-align:center; margin-bottom:20px; } .judul h3{ margin:0; font-size:18px; text-transform:uppercase; }table{ width:100%; border-collapse:collapse; margin-top:15px; font-size:12px; }th{ background:#1e1b4b; color:#fff; border:1px solid #000; padding:8px; } td{ border:1px solid #000; padding:6px; }.footer{ margin-top:30px; text-align:right; font-size:11px; }</style></head><body><div class="kop"><h2>PEMERINTAH KABUPATEN SINJAI</h2><h1>RSUD SINJAI</h1><p>Instalasi Pemeliharaan Sarana Rumah Sakit (IPSRS)</p></div><div class="judul"><h3>' + title + '</h3><p>Periode: ' + pDateText + '</p></div>' + target.innerHTML + '<div class="footer">Dicetak otomatis oleh Sistem Inventaris IPSRS: ' + new Date().toLocaleString('id-ID') + '</div></body></html>';
+      var printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.open(); printWindow.document.write(printContent); printWindow.document.close(); printWindow.focus();
+        setTimeout(function() { printWindow.print(); }, 1000);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI MERENDER DOM, TABEL & GRAFIK
+    // -------------------------------------------------------------
+    function formatDateIndo(dateStr) {
+      if (!dateStr) return '-';
+      var d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function renderMasterReferensi(data) {
+      var ek = document.getElementById('list-kategori'); var es = document.getElementById('list-satuan'); var eu = document.getElementById('list-unit');
+      var sk = document.getElementById('select-kategori'); var ekm = document.getElementById('edit_kategori');
+      var ss = document.getElementById('select-satuan'); var esm = document.getElementById('edit_satuan');
+      var su = document.getElementById('select-unit-kerja');
+      
+      if(ek) ek.innerHTML = ''; if(es) es.innerHTML = ''; if(eu) eu.innerHTML = '';
+      if(sk) sk.innerHTML = '<option value="">-- Pilih Kategori --</option>'; if(ekm) ekm.innerHTML = sk.innerHTML;
+      if(ss) ss.innerHTML = '<option value="">-- Pilih Satuan --</option>'; if(esm) esm.innerHTML = ss.innerHTML;
+      if(su) su.innerHTML = '<option value="">-- Pilih Unit Tujuan --</option>';
+      
+      (data || []).forEach(function(item) {
+        var li = '<li class="flex justify-between items-center py-2 border-b border-indigo-500/10 text-xs font-semibold last:border-0 hover:bg-indigo-900/20 px-2 rounded"><span>'+item.nilai+'</span><button onclick="handleDeleteRow(\'MASTER_REFERENSI\', \'id_referensi\', \''+item.id_referensi+'\')" class="text-rose-400"><i class="fa-solid fa-trash"></i></button></li>';
+        var opt = '<option value="'+item.nilai+'">'+item.nilai+'</option>';
+        if(item.jenis==='Kategori') { if(ek) ek.innerHTML+=li; if(sk) sk.innerHTML+=opt; if(ekm) ekm.innerHTML+=opt; }
+        else if(item.jenis==='Satuan') { if(es) es.innerHTML+=li; if(ss) ss.innerHTML+=opt; if(esm) esm.innerHTML+=opt; }
+        else if(item.jenis==='Unit Kerja') { if(eu) eu.innerHTML+=li; if(su) su.innerHTML+=opt; }
+      });
+    }
+
+    // Datalist Barang
+    function populateDatalistBarang(stokData) {
+      var dl = document.getElementById('list-barang-gudang'); if(!dl) return; dl.innerHTML = '';
+      (stokData || []).forEach(function(i){ dl.innerHTML += '<option value="'+i.nama_barang+'">'; });
+    }
+
+    function populateBarangKeluarDropdown(stokData) {
+      var select = document.getElementById('keluar_id_barang'); if (!select) return;
+      select.innerHTML = '<option value="">-- Pilih Barang Gudang --</option>';
+      (stokData || []).forEach(function(item) {
+        if (Number(item.stok_masuk) > 0) select.innerHTML += '<option value="' + item.id_barang + '">' + item.id_barang + ' - ' + item.nama_barang + ' (Sisa: ' + item.sisa_stok + ' ' + item.satuan + ')</option>';
+      });
+    }
+
+    function handleBarangKeluarSelectChange(idBarang) {
+      var item = state.stok_gudang.find(function(i) { return i.id_barang === idBarang; });
+      if(document.getElementById('keluar_satuan')) document.getElementById('keluar_satuan').value = item ? item.satuan : '';
+      if(document.getElementById('keluar_nama_barang')) document.getElementById('keluar_nama_barang').value = item ? item.nama_barang : '';
+    }
+
+    function populateUnitDropdown() {
+      var selectFilter = document.getElementById('filter-mutasi-unit'); if (!selectFilter) return;
+      var currentSelected = selectFilter.value;
+      var unitsFromRef = state.referensi.filter(function(item) { return item.jenis === 'Unit Kerja'; }).map(function(item) { return item.nilai; });
+      var uniqueUnits = Array.from(new Set(unitsFromRef.concat(state.barang_keluar.map(function(i){return i.unit_kerja;})))).filter(Boolean);
+      selectFilter.innerHTML = '<option value="SEMUA">-- Semua Unit Tujuan --</option>';
+      uniqueUnits.sort().forEach(function(u) { selectFilter.innerHTML += '<option value="'+u+'" '+(u===currentSelected?'selected':'')+'>'+u+'</option>'; });
+    }
+
+    function applyDateFilter(init) {
+      if(!init) { globalStartDate = document.getElementById('filter-start-date').value; globalEndDate = document.getElementById('filter-end-date').value; }
+      var filterFn = function(item) {
+        if(!globalStartDate && !globalEndDate) return true;
+        var d = new Date(item.tanggal); if(isNaN(d.getTime())) return true;
+        var s = globalStartDate ? new Date(globalStartDate) : new Date('1970-01-01');
+        var e = globalEndDate ? new Date(globalEndDate) : new Date('2099-12-31'); e.setHours(23,59,59);
+        return d >= s && d <= e;
+      };
+      filteredMasuk = state.barang_masuk.filter(filterFn); 
+      filteredKeluar = state.barang_keluar.filter(filterFn);
+      
+      renderLaporanDetailMasuk(filteredMasuk); 
+      renderLaporanDetailKeluar(filteredKeluar); 
+      renderLaporanMutasiUnitTable();
+    }
+
+    // Reset date filter
+    function resetDateFilter() {
+      document.getElementById('filter-start-date').value = ''; document.getElementById('filter-end-date').value = '';
+      globalStartDate = ''; globalEndDate = ''; applyDateFilter(true); showToast("Filter direset", "info");
+    }
+
+    function renderLaporanMutasiUnitTable() {
+      var tbody = document.getElementById('table-mutasi-unit-body'); if (!tbody) return; tbody.innerHTML = '';
+      var filterUnit = document.getElementById('filter-mutasi-unit')?.value || 'SEMUA';
+      var mutasiSummary = {};
+      
+      filteredKeluar.forEach(function(item) {
+        var unit = item.unit_kerja || 'Tanpa Unit';
+        if (filterUnit !== 'SEMUA' && unit !== filterUnit) return;
+        var key = unit + "_" + item.nama_barang;
+        if (!mutasiSummary[key]) mutasiSummary[key] = { unit_kerja: unit, nama_barang: item.nama_barang, jumlah_keluar: 0, satuan: item.satuan || 'pcs' };
+        mutasiSummary[key].jumlah_keluar += Number(item.jumlah);
+      });
+      
+      var sortedKeys = Object.keys(mutasiSummary).sort(function(a, b) { return mutasiSummary[a].unit_kerja.localeCompare(mutasiSummary[b].unit_kerja); });
+      if (sortedKeys.length === 0) return tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-slate-400 text-xs">Tidak ada data distribusi/mutasi pada periode terpilih.</td></tr>';
+      
+      sortedKeys.forEach(function(key, index) {
+        var item = mutasiSummary[key];
+        tbody.innerHTML += '<tr class="hover:bg-indigo-900/10"><td class="px-4 py-2 text-center text-slate-400 font-bold">' + (index + 1) + '</td><td class="px-4 py-2 font-bold text-white">' + item.unit_kerja + '</td><td class="px-4 py-2 text-white">' + item.nama_barang + '</td><td class="px-4 py-2 text-right text-rose-300 font-black">' + item.jumlah_keluar + '</td><td class="px-4 py-2 text-center text-slate-300">' + item.satuan + '</td></tr>';
+      });
+    }
+
+    function renderLaporanDetailMasuk(data) {
+      var tb = document.getElementById('table-laporan-masuk-body'); if(!tb) return; tb.innerHTML = '';
+      if(!data || data.length===0) return tb.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Kosong</td></tr>';
+      data.forEach(function(i){ tb.innerHTML += '<tr class="text-xs text-slate-300 hover:bg-indigo-900/10"><td class="p-2">'+formatDateIndo(i.tanggal)+'</td><td class="p-2 font-bold text-white">'+i.nama_barang+'</td><td class="p-2 text-right text-emerald-400 font-bold">'+i.jumlah+'</td><td class="p-2 text-center">'+i.satuan+'</td></tr>'; });
+    }
+
+    function renderLaporanDetailKeluar(data) {
+      var tb = document.getElementById('table-laporan-keluar-body'); if(!tb) return; tb.innerHTML = '';
+      if(!data || data.length===0) return tb.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Kosong</td></tr>';
+      data.forEach(function(i){ tb.innerHTML += '<tr class="text-xs text-slate-300 hover:bg-indigo-900/10"><td class="p-2">'+formatDateIndo(i.tanggal)+'</td><td class="p-2 font-bold text-white">'+i.nama_barang+'</td><td class="p-2 text-right text-rose-400 font-bold">'+i.jumlah+'</td><td class="p-2 text-center">'+i.satuan+'</td></tr>'; });
+    }
+
+    function renderBarangMasukTable(data) {
+      var tbody = document.getElementById('table-masuk-body'); if(!tbody) return; tbody.innerHTML = '';
+      if(!data || data.length===0) return tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400">Kosong</td></tr>';
+      data.forEach(function(item, i) {
+        tbody.innerHTML += '<tr class="hover:bg-indigo-900/10 text-xs"><td class="p-3 text-center font-bold">'+(i+1)+'</td><td class="p-3 text-emerald-300 font-mono">'+item.id_masuk+'</td><td class="p-3 text-slate-300">'+formatDateIndo(item.tanggal)+'</td><td class="p-3 font-mono text-indigo-300 font-bold">'+item.id_barang+'</td><td class="p-3 font-bold text-white">'+item.nama_barang+'</td><td class="p-3 text-center">'+item.satuan+'</td><td class="p-3 text-right text-emerald-400 font-bold">'+item.jumlah+'</td><td class="p-3">'+item.sumber_dana+'</td><td class="p-3 text-center no-print"><button onclick="openEditMasuk(\''+item.id_masuk+'\')" class="text-yellow-400 hover:underline mr-2"><i class="fa-solid fa-edit"></i></button><button onclick="handleDeleteRow(\'BARANG_MASUK\', \'id_masuk\', \''+item.id_masuk+'\')" class="text-rose-400"><i class="fa-solid fa-trash"></i></button></td></tr>';
+      });
+    }
+
+    function renderBarangKeluarTable(data) {
+      var tbody = document.getElementById('table-keluar-body'); if(!tbody) return; tbody.innerHTML = '';
+      if(!data || data.length===0) return tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400">Kosong</td></tr>';
+      data.forEach(function(item, i) {
+        tbody.innerHTML += '<tr class="hover:bg-indigo-900/10 text-xs"><td class="p-3 text-center font-bold">'+(i+1)+'</td><td class="p-3 text-slate-300">'+formatDateIndo(item.tanggal)+'</td><td class="p-3 font-mono text-indigo-300 font-bold">'+item.id_barang+'</td><td class="p-3 font-bold text-white">'+item.nama_barang+'</td><td class="p-3 text-center">'+item.satuan+'</td><td class="p-3 text-right text-rose-400 font-bold">'+item.jumlah+'</td><td class="p-3 text-indigo-300 font-medium">'+item.unit_kerja+'</td><td class="p-3 text-slate-300">'+item.penerima+'</td><td class="p-3 text-center no-print"><button onclick="handleDeleteRow(\'BARANG_KELUAR\', \'id_keluar\', \''+item.id_keluar+'\')" class="text-rose-400"><i class="fa-solid fa-trash"></i></button></td></tr>';
+      });
+    }
+
+    function renderCategoryScrollMenu() {
+      var c = document.getElementById('category-scroll-tabs'); if(!c) return;
+      var html = '<button onclick="filterStokByKategori(\'Semua Kategori\')" class="px-4 py-1.5 text-xs font-bold rounded-full border shrink-0 '+(selectedCategoryFilter==='Semua Kategori'?'bg-indigo-600 text-white border-indigo-400':'bg-indigo-950/40 text-indigo-300 border-indigo-500/20')+'">✨ Semua Kategori</button>';
+      state.referensi.filter(function(r){return r.jenis==='Kategori';}).forEach(function(item){
+        var s = selectedCategoryFilter === item.nilai;
+        html += '<button onclick="filterStokByKategori(\''+item.nilai+'\')" class="px-4 py-1.5 text-xs font-semibold rounded-full border shrink-0 '+(s?'bg-sky-600 text-white border-sky-400':'bg-indigo-950/40 text-indigo-300 border-indigo-500/20')+'">📁 '+item.nilai+'</button>';
+      });
+      c.innerHTML = html;
+    }
+
+    function filterStokByKategori(name) { 
+      selectedCategoryFilter = name; 
+      localStorage.setItem('selectedCategoryFilter', name); 
+      renderCategoryScrollMenu(); 
+      renderStokTable(state.stok_gudang); 
+    }
+
+    function renderStokTable(data) {
+      var tb = document.getElementById('table-stok-body'); var tbl = document.getElementById('table-laporan-stok-body');
+      if(!tb) return; tb.innerHTML = ''; if(tbl) tbl.innerHTML = '';
+      var filtered = selectedCategoryFilter === "Semua Kategori" ? data : data.filter(function(i){return i.kategori === selectedCategoryFilter;});
+      if(!filtered || filtered.length===0) { var em = '<tr><td colspan="10" class="p-4 text-center text-slate-400">Tidak ada data</td></tr>'; tb.innerHTML=em; if(tbl) tbl.innerHTML=em; return; }
+      filtered.forEach(function(item, i) {
+        var k = item.status === 'Stok Kritis';
+        var tr = '<tr class="hover:bg-indigo-900/10 text-xs"><td class="p-3 text-center font-bold">'+(i+1)+'</td><td class="p-3 font-mono text-indigo-300 font-bold">'+item.id_barang+'</td><td class="p-3 font-bold text-white">'+item.nama_barang+'</td><td class="p-3">'+item.kategori+'</td><td class="p-3 text-center">'+item.satuan+'</td><td class="p-3 text-right text-emerald-400">'+item.stok_masuk+'</td><td class="p-3 text-right text-rose-400">'+item.stok_keluar+'</td><td class="p-3 text-right font-black text-white bg-indigo-900/10">'+item.sisa_stok+'</td><td class="p-3 text-right text-amber-300">'+item.stok_minimal+'</td><td class="p-3 text-center"><span class="px-2 py-0.5 rounded text-[9px] font-extrabold '+(k?'bg-rose-500/20 text-rose-300 border border-rose-500/30':'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30')+'">'+(k?'KRITIS':'AMAN')+'</span></td></tr>';
+        tb.innerHTML+=tr; if(tbl) tbl.innerHTML+=tr;
+      });
+    }
+
+    function updateDashboardStats() {
+      var tm = state.barang_masuk.reduce(function(a,b){return a+(Number(b.jumlah)||0);},0);
+      var tk = state.barang_keluar.reduce(function(a,b){return a+(Number(b.jumlah)||0);},0);
+      var tot = tm + tk;
+      if(document.getElementById('dash-total-master')) document.getElementById('dash-total-master').innerText = state.stok_gudang.length;
+      if(document.getElementById('dash-total-masuk')) document.getElementById('dash-total-masuk').innerText = tm.toLocaleString('id-ID');
+      if(document.getElementById('dash-total-keluar')) document.getElementById('dash-total-keluar').innerText = tk.toLocaleString('id-ID');
+      if(document.getElementById('dash-pct-masuk')) document.getElementById('dash-pct-masuk').innerText = tot ? Math.round((tm/tot)*100)+"%" : "0%";
+      if(document.getElementById('dash-pct-keluar')) document.getElementById('dash-pct-keluar').innerText = tot ? Math.round((tk/tot)*100)+"%" : "0%";
+      
+      var kr = state.stok_gudang.filter(function(i){return i.status === 'Stok Kritis';});
+      if(document.getElementById('dash-total-kritis')) document.getElementById('dash-total-kritis').innerText = kr.length;
+
+      var tkri = document.getElementById('dash-table-kritis-30hari');
+      if(tkri) {
+        tkri.innerHTML = '';
+        if(kr.length===0) tkri.innerHTML = '<tr><td colspan="3" class="p-3 text-center text-slate-400">Aman</td></tr>';
+        else kr.slice(0,4).forEach(function(i){ tkri.innerHTML += '<tr class="border-b border-indigo-500/5 text-slate-300"><td class="p-2 truncate max-w-[120px] font-medium">'+i.nama_barang+'</td><td class="p-2 text-right text-rose-300 font-bold">'+i.sisa_stok+' '+i.satuan+'</td><td class="p-2 text-right text-amber-400 font-bold">'+i.stok_minimal+'</td></tr>'; });
+      }
+
+      var tpop = document.getElementById('dash-table-populer-30hari');
+      if(tpop) {
+        tpop.innerHTML = '';
+        var freq = {}; state.barang_keluar.forEach(function(x){ freq[x.nama_barang] = (freq[x.nama_barang]||0) + Number(x.jumlah); });
+        var arr = Object.keys(freq).map(function(k){return {n:k, v:freq[k]};}).sort(function(a,b){return b.v-a.v;}).slice(0,4);
+        if(arr.length===0) tpop.innerHTML = '<tr><td colspan="2" class="p-3 text-center text-slate-400">Belum ada penyaluran</td></tr>';
+        else arr.forEach(function(i){ tpop.innerHTML += '<tr class="border-b border-indigo-500/5 text-slate-300"><td class="p-2 font-medium truncate max-w-[140px]">'+i.n+'</td><td class="p-2 text-right text-sky-300 font-bold">'+i.v+' item</td></tr>'; });
+      }
+
+      var tu = document.getElementById('dash-grid-unit-aktif');
+      if(tu) {
+        tu.innerHTML = '';
+        var ustat = {}; state.barang_keluar.forEach(function(x){ ustat[x.unit_kerja] = (ustat[x.unit_kerja]||0) + Number(x.jumlah); });
+        var uarr = Object.keys(ustat).map(function(k){return {n:k, v:ustat[k]};}).sort(function(a,b){return b.v-a.v;}).slice(0,3);
+        if(uarr.length===0) tu.innerHTML = '<div class="text-center p-3 text-slate-400 w-full">Kosong</div>';
+        else uarr.forEach(function(u, idx){ tu.innerHTML += '<div class="bg-indigo-950/40 p-3 rounded-xl border border-indigo-500/10 flex-1 flex justify-between items-center font-bold text-xs"><span class="truncate max-w-[80px]">'+u.n+'</span><span class="text-indigo-300 shrink-0">'+u.v+' item</span></div>'; });
+      }
+      
+      var tMasuk = document.getElementById('dash-table-masuk'); 
+      if (tMasuk) {
+        tMasuk.innerHTML = '';
+        state.barang_masuk.slice(-5).reverse().forEach(function(item) { 
+          tMasuk.innerHTML += '<tr class="border-b border-indigo-950/20 text-xs hover:bg-indigo-900/10"><td class="py-2.5 text-slate-300">' + formatDateIndo(item.tanggal) + '</td><td class="py-2.5 font-bold text-white">' + (item.nama_barang || '-') + '</td><td class="py-2.5 text-right text-emerald-400 font-bold">' + (item.jumlah || 0) + ' ' + (item.satuan || '') + '</td></tr>'; 
+        });
+      }
+      
+      var tKeluar = document.getElementById('table-keluar-body-dashboard'); 
+      if (tKeluar) {
+        tKeluar.innerHTML = '';
+        state.barang_keluar.slice(-5).reverse().forEach(function(item) { 
+          tKeluar.innerHTML += '<tr class="border-b border-indigo-950/20 text-xs hover:bg-indigo-900/10"><td class="py-2.5 text-slate-300">' + formatDateIndo(item.tanggal) + '</td><td class="py-2.5 font-bold text-white">' + (item.nama_barang || '-') + '</td><td class="py-2.5 text-indigo-300 font-medium">' + (item.unit_kerja || '-') + '</td><td class="py-2.5 text-right text-rose-400 font-bold">' + (item.jumlah || 0) + ' ' + (item.satuan || '') + '</td></tr>'; 
+        });
+      }
+
+      renderPieChartSatuan();
+    }
+
+    function renderPieChartSatuan() {
+      var vol = {}; state.barang_keluar.forEach(function(x){ var s=x.satuan||'Pcs'; vol[s] = (vol[s]||0) + Number(x.jumlah); });
+      var lbs = Object.keys(vol); var vls = Object.values(vol);
+      var tot = vls.reduce(function(a,b){return a+b;},0);
+      if(document.getElementById('infographic-chart-total')) document.getElementById('infographic-chart-total').innerText = tot.toLocaleString('id-ID');
+      var colors = ['#6366f1', '#06b6d4', '#ec4899', '#f59e0b', '#10b981'];
+      if (myPieChart) myPieChart.destroy();
+      var ctxEl = document.getElementById('pieChartSatuan'); if (!ctxEl || lbs.length===0) {
+        var lg = document.getElementById('pieChart-legend'); if(lg) lg.innerHTML = '<div class="col-span-2 text-center text-slate-400 text-[10px]">Belum ada penyaluran</div>';
+        return;
+      }
+      myPieChart = new Chart(ctxEl.getContext('2d'), {
+        type: 'doughnut', data: { labels: lbs, datasets: [{ data: vls, backgroundColor: colors.slice(0, lbs.length), borderWidth: 1.5, borderColor: '#0b091a' }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
+      });
+      var lg = document.getElementById('pieChart-legend'); if(lg) { lg.innerHTML = ''; lbs.forEach(function(l, i){ lg.innerHTML += '<div class="flex items-center gap-1 font-semibold text-[10px]"><span class="w-2 h-2 rounded-full block" style="background:'+colors[i % colors.length]+'"></span><span class="truncate max-w-[60px] text-slate-300">'+l+'</span><span class="ml-auto text-white font-bold">'+vol[l]+'</span></div>'; }); }
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI CRUD SUPABASE 
+    // -------------------------------------------------------------
+
+    function handleDeleteRow(table, field, value) {
+      var mc = document.getElementById('modal-confirm'); var txt = document.getElementById('modal-confirm-text');
+      var bc = document.getElementById('btn-confirm-cancel'); var bok = document.getElementById('btn-confirm-ok');
+      if(!mc || !txt) return;
+      txt.innerText = "Hapus permanen data "+value+"?";
+      mc.classList.remove('hidden'); mc.classList.add('flex');
+      bc.onclick = function() { mc.classList.add('hidden'); mc.classList.remove('flex'); };
+      bok.onclick = async function() {
+        mc.classList.add('hidden'); mc.classList.remove('flex'); 
+        showSyncOverlay(); 
+        
+        let sbTable = table === 'MASTER_REFERENSI' ? 'referensi' : table.toLowerCase();
+        try { 
+          const { error } = await supabaseClient.from(sbTable).delete().eq(field, value);
+          if (error) throw error;
+          showToast("Berhasil dihapus dari Supabase!", "success"); 
+        } catch(e) { 
+          showToast("Gagal menghapus dari Supabase.", "error");
+        }
+        await refreshAllData(false);
+      };
+    }
+
+    async function handleFormSubmission(event, table, modalId) {
+      event.preventDefault(); var form = event.target; var fd = new FormData(form); var rec = {};
+      fd.forEach(function(v,k){rec[k]=v;}); closeModal(modalId); 
+      showSyncOverlay(); 
+      
+      if(table==='MASTER_REFERENSI') {
+        rec.id_referensi = 'REF-'+Math.floor(10000+Math.random()*90000);
+      } else {
+        var ex = (state.stok_gudang || []).find(function(x){return x.nama_barang.toLowerCase().trim() === rec.nama_barang.toLowerCase().trim();});
+        rec.id_barang = ex ? ex.id_barang : 'IPS-'+String((state.stok_gudang || []).length+1).padStart(3,'0');
+        rec.id_masuk = 'IN-'+Math.floor(1000+Math.random()*9000);
+        rec.jumlah = Number(rec.jumlah);
+        rec.limit_stok = Number(rec.limit_stok) || 5;
+      }
+      
+      let sbTable = table === 'MASTER_REFERENSI' ? 'referensi' : table.toLowerCase();
+      try { 
+        const { error } = await supabaseClient.from(sbTable).insert([rec]);
+        if (error) throw error;
+        form.reset(); 
+        showToast("Tersimpan di Database Supabase!", "success"); 
+      } catch(e){ 
+        showToast("Gagal menyimpan ke Supabase.", "error");
+      }
+      
+      if(table==='BARANG_MASUK') toggleSubLogistik('masuk');
+      await refreshAllData(false); 
+    }
+
+    async function handleEditMasukSubmission(event) {
+      event.preventDefault(); var form = event.target; var fd = new FormData(form); var rec = {};
+      fd.forEach(function(v,k){rec[k]=v;}); closeModal('modal-edit-masuk'); 
+      showSyncOverlay(); 
+      
+      rec.jumlah = Number(rec.jumlah);
+      rec.limit_stok = Number(rec.limit_stok) || 5;
+      
+      try { 
+        const { error } = await supabaseClient.from('barang_masuk').update(rec).eq('id_masuk', rec.id_masuk);
+        if (error) throw error;
+        showToast("Data barang masuk diubah di Supabase!", "success"); 
+      } catch(e){ 
+        showToast("Gagal mengubah di Supabase.", "error");
+      }
+      await refreshAllData(false);
+    }
+
+    async function handleBarangKeluarFormSubmit(event) {
+      event.preventDefault(); var form = event.target; var fd = new FormData(form); var rec = {};
+      fd.forEach(function(v,k){rec[k]=v;});
+      
+      var st = (state.stok_gudang || []).find(function(x){return x.id_barang === rec.id_barang;});
+      if(!st || (parseFloat(rec.jumlah)||0) > st.sisa_stok) { 
+        showToast("Gagal! Stok tidak mencukupi", "error"); 
+        closeModal('modal-keluar'); 
+        return; 
+      }
+      
+      closeModal('modal-keluar'); 
+      showSyncOverlay(); 
+      
+      rec.jumlah = Number(rec.jumlah);
+      
+      try { 
+        const { error } = await supabaseClient.from('barang_keluar').insert([rec]);
+        if (error) throw error;
+        form.reset(); 
+        showToast("Distribusi dicatat di Supabase!", "success"); 
+      } catch(e){ 
+        showToast("Gagal mencatat distribusi.", "error");
+      }
+      
+      toggleSubLogistik('keluar'); 
+      await refreshAllData(false);
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI ASISTEN AI (GROQ / GEMINI)
+    // -------------------------------------------------------------
+    async function handleSendChat(event) {
+      event.preventDefault(); var input = document.getElementById('chat-input'); var text = input.value.trim(); if(!text) return;
+      var conv = document.getElementById('chat-conversation'); if(!conv) return;
+      conv.innerHTML += '<div class="bg-indigo-600 p-3 rounded-2xl text-white ml-auto max-w-[85%] text-right text-xs shadow-md">'+text+'</div>';
+      input.value = ''; conv.scrollTop = conv.scrollHeight;
+      var loaderId = 'loader-'+Date.now();
+      var selectedEngine = localStorage.getItem('ipsrs_ai_engine') || "groq";
+      var engineLabel = selectedEngine === "groq" ? "Groq (Llama 3.1)" : "Gemini 2.5";
+      conv.innerHTML += '<div id="'+loaderId+'" class="bg-indigo-950/40 p-3 rounded-2xl text-indigo-300 text-[10px] flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> '+engineLabel+' sedang menganalisis data...</div>';
+      conv.scrollTop = conv.scrollHeight;
+      await askAssistantAI(text, loaderId, selectedEngine);
+    }
+
+    async function askAssistantAI(query, loaderId, engine) {
+      var conv = document.getElementById('chat-conversation'); if(!conv) return;
+      var ctxStok = state.stok_gudang.map(function(i){return `- ${i.id_barang} | ${i.nama_barang} | Sisa: ${i.sisa_stok} ${i.satuan} | Status: ${i.status}`;}).join("\n");
+      var sys = `Kamu adalah AI Assistant Gudang IPSRS RSUD Sinjai. Jawab ringkas, padat, ramah. Gunakan data berikut:\n${ctxStok}`;
+      var ok = false; var txt = "";
+      if(engine === 'groq') {
+        var key = localStorage.getItem('ipsrs_groq_key') || defaultGroqKey;
+        if(!key) { removeLoaderAndNotify(loaderId, "⚠️ Isi Groq API Key di Pengaturan"); return; }
+        try {
+          var r = await fetch("https://api.groq.com/openai/v1/chat/completions", { method:"POST", headers:{"Authorization":"Bearer "+key,"Content-Type":"application/json"}, body:JSON.stringify({model:"llama-3.1-8b-instant",messages:[{role:"system",content:sys},{role:"user",content:query}],temperature:0.2,max_tokens:500}) });
+          var res = await r.json(); txt = res.choices?.[0]?.message?.content; if(txt) ok=true;
+        } catch(e){}
+      } else {
+        var key = localStorage.getItem('ipsrs_gemini_key') || "";
+        if(!key) { removeLoaderAndNotify(loaderId, "⚠️ Isi Gemini API Key di Pengaturan"); return; }
+        try {
+          var r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:query}]}],systemInstruction:{parts:[{text:sys}]}})});
+          var res = await r.json(); txt = res.candidates?.[0]?.content?.parts?.[0]?.text; if(txt) ok=true;
+        } catch(e){}
+      }
+      if(document.getElementById(loaderId)) document.getElementById(loaderId).remove();
+      conv.innerHTML += '<div class="bg-indigo-950/60 p-3 rounded-2xl text-gray-200 text-xs max-w-[85%] whitespace-pre-wrap shadow-sm">'+(ok?txt:"⚠️ Gagal memuat respon AI. Periksa API Key Anda.")+'</div>';
+      conv.scrollTo(0, conv.scrollHeight);
+    }
+
+    function removeLoaderAndNotify(loaderId, htmlMsg) {
+      var loaderEl = document.getElementById(loaderId); if(loaderEl) loaderEl.remove();
+      var conv = document.getElementById('chat-conversation');
+      if(conv) { conv.innerHTML += '<div class="bg-indigo-950/60 p-3 rounded-2xl border border-amber-500/30 text-amber-300 max-w-[85%] text-xs shadow-sm">'+htmlMsg+'</div>'; conv.scrollTop = conv.scrollHeight; }
+    }
+
+    // -------------------------------------------------------------
+    // FUNGSI BACKUP & RESTORE
+    // -------------------------------------------------------------
+    function exportBackup() {
+      var data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      var a = document.createElement('a'); a.setAttribute("href", data); a.setAttribute("download", `IPSRS_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(a); a.click(); a.remove(); showToast("Backup sukses!", "success");
+    }
+
+    function triggerRestoreUpload() {
+      var input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+      input.onchange = e => {
+        var f = e.target.files[0]; if(!f) return;
+        var r = new FileReader(); r.onload = ev => {
+          try {
+            var parsed = JSON.parse(ev.target.result);
+            if(parsed.referensi && parsed.barang_masuk && parsed.barang_keluar) {
+              state = parsed; saveDatabase(); showToast("Restore sukses!", "success"); applyCustomIdentity(); refreshAllData(true);
+            } else { showToast("Format salah", "error"); }
+          } catch(ex){ showToast("File rusak", "error"); }
+        }; r.readAsText(f, 'UTF-8');
+      }; input.click();
+    }
+  </script>
+</body>
+</html>
