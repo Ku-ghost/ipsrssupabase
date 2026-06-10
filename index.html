@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -663,27 +664,35 @@
 
   <!-- SCRIPT UTAMA SUPABASE -->
   <script>
+    // =========================================================================
+    // INISIALISASI SUPABASE KLIEN (MENGGUNAKAN NAMA INDEPENDEN UNTUK CEGAH KONFLIK)
+    // =========================================================================
     const supabaseUrl = 'https://gyyvqoxlkbjrzwvmyoam.supabase.co';
     const supabaseKey = 'sb_publishable_6v1zw9GoQtJGlXbyE3dl5Q_8zl2I_wc';
     const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-
+    
+    // API KEY GROQ DEFAULT (Sesuai Permintaan Kakak)
     var defaultGroqKey = "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";
+    
     var state = { referensi: [], barang_masuk: [], barang_keluar: [], stok_gudang: [], app_title: "SISFO STOK BARANG IPSRS", app_subtitle: "RSUD SINJAI - SULAWESI SELATAN" };
     var filteredMasuk = [], filteredKeluar = [];
     var globalStartDate = '', globalEndDate = '';
     var selectedCategoryFilter = localStorage.getItem('selectedCategoryFilter') || "Semua Kategori";
     var myPieChart = null;
     var pendingTab = ''; 
-    var fallbackInterval = null;
-    var isSupabaseReady = false;
+    var fallbackInterval = null; // Menampung interval polling
 
+    // On Load Window Event
     window.onload = function() {
       try {
         initDatabase();
         applyCustomIdentity();
-        initSupabaseConnection();
+        
+        // Memulai Koneksi Realtime Supabase
+        initSupabaseRealtime();
       } catch(e) {}
 
+      // Live clock
       setInterval(function() {
         try {
           var liveClock = document.getElementById('live-clock');
@@ -698,10 +707,11 @@
         
         var activeTab = localStorage.getItem('activeTab') || 'tab-dashboard';
         showTab(activeTab);
-        refreshAllData();
+        refreshAllData(); 
       } catch(e) {}
     };
 
+    // Fungsi Inisialisasi Backup Lokal / Mode Demo (Sebagai Fallback)
     function initDatabase() {
       var savedState = localStorage.getItem('ipsrs_stock_state_v2');
       if (savedState) {
@@ -713,6 +723,7 @@
       } else {
         resetToDefaultState();
       }
+      
       state.referensi = state.referensi || [];
       state.barang_masuk = state.barang_masuk || [];
       state.barang_keluar = state.barang_keluar || [];
@@ -729,6 +740,10 @@
     function saveDatabase() { 
       localStorage.setItem('ipsrs_stock_state_v2', JSON.stringify(state)); 
     }
+
+    // -------------------------------------------------------------
+    // FUNGSI KOMUNIKASI SUPABASE
+    // -------------------------------------------------------------
 
     function updateConnectionBadge(status, errorMsg = "") {
       var badge = document.getElementById('connection-status-badge'); 
@@ -754,16 +769,7 @@
       }
     }
 
-    function initSupabaseConnection() {
-      updateConnectionBadge("connecting");
-      isSupabaseReady = !!window.supabase && !!supabaseClient;
-      if (!isSupabaseReady) {
-        updateConnectionBadge("error", "Supabase SDK tidak tersedia");
-        return;
-      }
-      updateConnectionBadge("online");
-    }
-
+    // Fungsi uji kelayakan WebSocket untuk mencegah SecurityError di dalam iframe Canvas sandbox
     function isWebSocketAllowed() {
       if (typeof window.WebSocket === 'undefined') return false;
       try {
@@ -775,26 +781,41 @@
       }
     }
 
+    // Menggantikan WebSockets Cloudflare dengan Supabase Realtime Channels yang aman dari restriksi sandbox
     function initSupabaseRealtime() {
       if (fallbackInterval) clearInterval(fallbackInterval);
+      
       updateConnectionBadge("connecting");
+      
+      // Jika WebSocket diblokir (di dalam Canvas), gunakan fallback HTTP Polling otomatis tanpa melempar SecurityError
       if (!isWebSocketAllowed()) {
+        console.warn("Jaringan WebSocket dibatasi di lingkungan ini (Iframe Canvas Sandbox). Mengaktifkan fallback HTTP Polling otomatis.");
         updateConnectionBadge("online_polling");
         fallbackInterval = setInterval(function() {
           refreshAllData(true);
-        }, 5000);
+        }, 5000); // Sinkronisasi setiap 5 detik secara sunyi
         return;
       }
       
       try {
         const channel = supabaseClient.channel('ipsrs-public-changes');
+        
         channel
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'referensi' }, payload => refreshAllData(true))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_masuk' }, payload => refreshAllData(true))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_keluar' }, payload => refreshAllData(true))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'referensi' }, payload => {
+            refreshAllData(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_masuk' }, payload => {
+            refreshAllData(true);
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'barang_keluar' }, payload => {
+            refreshAllData(true);
+          })
           .subscribe((status) => {
-            if (status === 'SUBSCRIBED') updateConnectionBadge("online");
-            else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') updateConnectionBadge("error", "Koneksi Realtime Terputus");
+            if (status === 'SUBSCRIBED') {
+              updateConnectionBadge("online");
+            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              updateConnectionBadge("error", "Koneksi Realtime Terputus");
+            }
           });
       } catch (e) {
         updateConnectionBadge("error", e.message);
@@ -802,10 +823,6 @@
     }
 
     async function refreshAllData(silent = false) {
-      if (!isSupabaseReady) {
-        updateConnectionBadge("demo");
-        return;
-      }
       if (!silent) showSyncOverlay();
       try {
         const [resRef, resMasuk, resKeluar] = await Promise.all([
@@ -825,12 +842,14 @@
         calculateStokGudang();
         saveDatabase(); 
         
+        // Mempertahankan badge tetap 'online_polling' jika sedang dalam mode fallback
         if (!isWebSocketAllowed()) {
           updateConnectionBadge("online_polling");
         } else {
           updateConnectionBadge("online");
         }
       } catch (err) {
+        // Fallback otomatis ke data lokal jika terjadi eror cloud
         var local = localStorage.getItem('ipsrs_stock_state_v2');
         if (local) {
           try {
@@ -857,7 +876,9 @@
         updateDashboardStats();
       } catch (renderError) {
       } finally {
-        if (!silent) hideSyncOverlay();
+        if (!silent) {
+          hideSyncOverlay();
+        }
       }
     }
 
@@ -887,6 +908,9 @@
       });
     }
 
+    // -------------------------------------------------------------
+    // PENGATURAN IDENTITAS DAN AI
+    // -------------------------------------------------------------
     function applyCustomIdentity() {
       var savedTitle = localStorage.getItem('app_title') || state.app_title;
       var savedSubtitle = localStorage.getItem('app_subtitle') || state.app_subtitle;
@@ -898,6 +922,7 @@
       if (document.getElementById('cfg-subtitle')) document.getElementById('cfg-subtitle').value = savedSubtitle;
       
       if (document.getElementById('cfg-gemini-key')) document.getElementById('cfg-gemini-key').value = localStorage.getItem('ipsrs_gemini_key') || "";
+      // Menggunakan fallback kunci Groq default jika belum diset secara lokal
       if (document.getElementById('cfg-groq-key')) document.getElementById('cfg-groq-key').value = localStorage.getItem('ipsrs_groq_key') || defaultGroqKey;
       if (document.getElementById('cfg-ai-engine')) document.getElementById('cfg-ai-engine').value = localStorage.getItem('ipsrs_ai_engine') || "groq";
       adjustAiInputVisibility();
@@ -931,6 +956,10 @@
       if(el.type==='password') { el.type='text'; icon.className='fa-solid fa-eye-slash'; }
       else { el.type='password'; icon.className='fa-solid fa-eye'; }
     }
+
+    // -------------------------------------------------------------
+    // FUNGSI NAVIGASI & MODAL
+    // -------------------------------------------------------------
 
     function openAuthGate() {
       var m = document.getElementById('modal-auth-gate');
@@ -982,14 +1011,18 @@
       document.getElementById('gate-pass').value = '';
     }
 
+    // PROSES LOGOUT ADMIN PENUH TANPA MEMUTUS KONEKSI SUPABASE
     function handleLogout() {
       sessionStorage.removeItem('is_ipsrs_auth');
       showToast("Sesi akses admin dikunci.", "info");
       updateAuthStatusBadge(); 
       showTab('tab-dashboard');
+      
+      // Menguji & membuktikan database Supabase tetap aktif berjalan di publik
       refreshAllData(true); 
     }
 
+    // MEMASTIKAN LOGIN HARUS 'Ipsrs123' DAN '123Ipsrs'
     function getAdminCredentials() {
       var saved = localStorage.getItem('ipsrs_admin_creds');
       if (saved) return JSON.parse(saved);
@@ -1083,6 +1116,7 @@
       }, 200);
     }
 
+    // Modal Master
     function openModalMaster(jenis) {
       var input = document.getElementById('master-jenis-input');
       if (input) input.value = jenis;
@@ -1146,6 +1180,9 @@
       }
     }
 
+    // -------------------------------------------------------------
+    // FUNGSI MERENDER DOM, TABEL & GRAFIK
+    // -------------------------------------------------------------
     function formatDateIndo(dateStr) {
       if (!dateStr) return '-';
       var d = new Date(dateStr);
@@ -1173,6 +1210,7 @@
       });
     }
 
+    // Datalist Barang
     function populateDatalistBarang(stokData) {
       var dl = document.getElementById('list-barang-gudang'); if(!dl) return; dl.innerHTML = '';
       (stokData || []).forEach(function(i){ dl.innerHTML += '<option value="'+i.nama_barang+'">'; });
@@ -1246,6 +1284,7 @@
       data.forEach(function(i){ tb.innerHTML += '<tr class="text-xs text-slate-300 hover:bg-indigo-900/10"><td class="p-2">'+formatDateIndo(i.tanggal)+'</td><td class="p-2 font-bold text-white">'+i.nama_barang+'</td><td class="p-2 text-right text-emerald-400 font-bold">'+i.jumlah+'</td><td class="p-2 text-center">'+i.satuan+'</td></tr>'; });
     }
 
+    // Render detail barang keluar
     function renderLaporanDetailKeluar(data) {
       var tb = document.getElementById('table-laporan-keluar-body'); if(!tb) return; tb.innerHTML = '';
       if(!data || data.length===0) return tb.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Kosong</td></tr>';
@@ -1372,6 +1411,10 @@
       var lg = document.getElementById('pieChart-legend'); if(lg) { lg.innerHTML = ''; lbs.forEach(function(l, i){ lg.innerHTML += '<div class="flex items-center gap-1 font-semibold text-[10px]"><span class="w-2 h-2 rounded-full block" style="background:'+colors[i % colors.length]+'"></span><span class="truncate max-w-[60px] text-slate-300">'+l+'</span><span class="ml-auto text-white font-bold">'+vol[l]+'</span></div>'; }); }
     }
 
+    // -------------------------------------------------------------
+    // FUNGSI CRUD SUPABASE 
+    // -------------------------------------------------------------
+
     function handleDeleteRow(table, field, value) {
       var mc = document.getElementById('modal-confirm'); var txt = document.getElementById('modal-confirm-text');
       var bc = document.getElementById('btn-confirm-cancel'); var bok = document.getElementById('btn-confirm-ok');
@@ -1471,6 +1514,9 @@
       await refreshAllData(false);
     }
 
+    // -------------------------------------------------------------
+    // FUNGSI ASISTEN AI (GROQ / GEMINI)
+    // -------------------------------------------------------------
     async function handleSendChat(event) {
       event.preventDefault(); var input = document.getElementById('chat-input'); var text = input.value.trim(); if(!text) return;
       var conv = document.getElementById('chat-conversation'); if(!conv) return;
@@ -1515,6 +1561,9 @@
       if(conv) { conv.innerHTML += '<div class="bg-indigo-950/60 p-3 rounded-2xl border border-amber-500/30 text-amber-300 max-w-[85%] text-xs shadow-sm">'+htmlMsg+'</div>'; conv.scrollTop = conv.scrollHeight; }
     }
 
+    // -------------------------------------------------------------
+    // FUNGSI BACKUP & RESTORE
+    // -------------------------------------------------------------
     function exportBackup() {
       var data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
       var a = document.createElement('a'); a.setAttribute("href", data); a.setAttribute("download", `IPSRS_BACKUP_${new Date().toISOString().slice(0,10)}.json`);
