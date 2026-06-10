@@ -768,11 +768,10 @@
       }
     }
 
-    // SAKTI: Fungsi uji kelayakan WebSocket untuk mencegah SecurityError di dalam iframe Canvas sandbox
+    // Fungsi uji kelayakan WebSocket untuk mencegah SecurityError di dalam iframe Canvas sandbox
     function isWebSocketAllowed() {
       if (typeof window.WebSocket === 'undefined') return false;
       try {
-        // Coba instansiasi WebSocket secara synchronous, jika diblokir oleh sandbox maka akan melempar SecurityError
         const testWS = new WebSocket("wss://gyyvqoxlkbjrzwvmyoam.supabase.co/realtime/v1/websocket");
         testWS.close();
         return true;
@@ -1011,7 +1010,7 @@
       document.getElementById('gate-pass').value = '';
     }
 
-    // SAKTI: PROSES LOGOUT ADMIN PENUH TANPA MEMUTUS KONEKSI SUPABASE
+    // PROSES LOGOUT ADMIN PENUH TANPA MEMUTUS KONEKSI SUPABASE
     function handleLogout() {
       sessionStorage.removeItem('is_ipsrs_auth');
       showToast("Sesi akses admin dikunci.", "info");
@@ -1256,12 +1255,6 @@
       renderLaporanMutasiUnitTable();
     }
 
-    // Reset date filter
-    function resetDateFilter() {
-      document.getElementById('filter-start-date').value = ''; document.getElementById('filter-end-date').value = '';
-      globalStartDate = ''; globalEndDate = ''; applyDateFilter(true); showToast("Filter direset", "info");
-    }
-
     function renderLaporanMutasiUnitTable() {
       var tbody = document.getElementById('table-mutasi-unit-body'); if (!tbody) return; tbody.innerHTML = '';
       var filterUnit = document.getElementById('filter-mutasi-unit')?.value || 'SEMUA';
@@ -1290,6 +1283,7 @@
       data.forEach(function(i){ tb.innerHTML += '<tr class="text-xs text-slate-300 hover:bg-indigo-900/10"><td class="p-2">'+formatDateIndo(i.tanggal)+'</td><td class="p-2 font-bold text-white">'+i.nama_barang+'</td><td class="p-2 text-right text-emerald-400 font-bold">'+i.jumlah+'</td><td class="p-2 text-center">'+i.satuan+'</td></tr>'; });
     }
 
+    // Render detail barang keluar
     function renderLaporanDetailKeluar(data) {
       var tb = document.getElementById('table-laporan-keluar-body'); if(!tb) return; tb.innerHTML = '';
       if(!data || data.length===0) return tb.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Kosong</td></tr>';
